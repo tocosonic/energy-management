@@ -7,10 +7,10 @@ class WeatherService:
         self.latitude = latitude
         self.longitude = longitude
         self.sunrise_sunset = [0.0, 0.0]
-        self._querySunriseSunset()
+        self._query_sunrise_sunset()
 
-    def _querySunriseSunset(self):
-        # Query Sunrise and Sunset
+    # Query Sunrise and Sunset
+    def _query_sunrise_sunset(self):
         try:
             url = "https://api.openweathermap.org/data/2.5/weather"
             
@@ -30,13 +30,14 @@ class WeatherService:
         except Exception as e:
             print(f"Error fetching sunrise and sunset times: {e}")
 
-    def isCloseToSunset(self, threshold_minutes=90):
+    # Checks if the current time is within a specified number of minutes of sunset.
+    def is_close_to_sunset(self, threshold_minutes=90):
         if self.sunrise_sunset[1] > 0.0:
             # Convert threshold from minutes to seconds
             threshold_seconds = threshold_minutes * 60
-            currentTime = time.localtime()
-            sunsetTime = time.localtime(self.sunrise_sunset[1])
-            time_diff = time.mktime(sunsetTime) - time.mktime(currentTime)
+            current_time = time.localtime()
+            sunset_time = time.localtime(self.sunrise_sunset[1])
+            time_diff = time.mktime(sunset_time) - time.mktime(current_time)
             return time_diff <= threshold_seconds
         else:
             return False
