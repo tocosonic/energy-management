@@ -13,7 +13,6 @@ class WeatherService:
     def _query_sunrise_sunset(self):
         try:
             url = "https://api.openweathermap.org/data/2.5/weather"
-            
             params = {
                 "lat": self.latitude,
                 "lon": self.longitude,
@@ -41,4 +40,4 @@ class WeatherService:
             return time_diff <= threshold_seconds
         else:
             return False
-    
+

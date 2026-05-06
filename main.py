@@ -22,7 +22,7 @@ def main():
         print("It's close to sunset. Energy production will drop soon.")
     else:
         print("It's not close to sunset. Energy production will continue for a longer time.")
-    
+
     battery_status = sonnen_battery_service.get_battery_status()
     print(f"Sonnen battery status: {battery_status}")
     print(f"Energy consumption: {sonnen_battery_service.get_energy_consumption()}")
