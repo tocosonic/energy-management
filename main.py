@@ -4,6 +4,7 @@ from time import sleep
 import RPi.GPIO as GPIO
 
 from dotenv import load_dotenv
+from services.goe_service import GoEService
 from services.sonnen_battery_service import SonnenBatteryService
 from services.weather_service import WeatherService
 from services.sgready_device_service import SGReadyDeviceService
@@ -17,12 +18,13 @@ def main():
     warm_water_heatpump_service = SGReadyDeviceService(int(os.getenv("RELAY_PIN_WW")))
     heating_heatpump_service1 = SGReadyDeviceService(int(os.getenv("RELAY_PIN_HEATING1")))
     heating_heatpump_service2 = SGReadyDeviceService(int(os.getenv("RELAY_PIN_HEATING2")))
+    goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"))
 
     # Example usage of services
-    if weather_service.is_close_to_sunset():
-        print("It's close to sunset. Energy production will drop soon.")
-    else:
-        print("It's not close to sunset. Energy production will continue for a longer time.")
+    # if weather_service.is_close_to_sunset():
+    #     print("It's close to sunset. Energy production will drop soon.")
+    # else:
+    #     print("It's not close to sunset. Energy production will continue for a longer time.")
 
     battery_status = sonnen_battery_service.get_battery_status()
     print(f"Sonnen battery status: {battery_status}")
@@ -34,6 +36,11 @@ def main():
     print(f"Warm water heat pump status: {'ON' if warm_water_heatpump_service.get_status() == GPIO.LOW else 'OFF'}")
     print(f"Heating heat pump 1 status: {'ON' if heating_heatpump_service1.get_status() == GPIO.LOW else 'OFF'}")
     print(f"Heating heat pump 2 status: {'ON' if heating_heatpump_service2.get_status() == GPIO.LOW else 'OFF'}")
+    
+    print(f"Last user from GoE: {goe_service.get_last_user()}")
+    print(f"Car status from GoE: {goe_service.get_car_status()}")
+    print(f"Is car charging allowed from GoE: {goe_service.is_car_charging_allowed()}")
+    print(f"Error from GoE: {goe_service.get_error()}")
     
     # sonnen_battery_service.set_disable_discharge()
     # sonnen_battery_service.refresh_status()
