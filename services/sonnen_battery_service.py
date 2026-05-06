@@ -47,3 +47,28 @@ class SonnenBatteryService:
     def get_battery_level(self) -> int:
         return self.sonnen_status["USOC"] if self.sonnen_status else None
     
+    def set_disable_discharge(self):
+        self._set_discharge(True)
+        
+    def set_enable_discharge(self):
+        self._set_discharge(False)
+    
+    def _set_discharge(self, disable: bool):
+        try:
+            url = f"http://{self.host}/api/v2/configurations"
+            headers = {
+                "Auth-Token": f"{self.api_key}",
+                "Content-Type": "application/json"
+            }
+            if disable:
+                data = {"EM_OperatingMode": 1}
+            else:
+                data = {"EM_OperatingMode": 2}
+            
+            response = requests.put(url, headers=headers, json=data)
+            if response.status_code == 200:
+                print(f"Successfully set disable discharge to {disable}")
+            else:
+                print(f"Error setting disable discharge: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"Error setting disable discharge: {e}")

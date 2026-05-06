@@ -1,5 +1,6 @@
 # main.py
 import os
+from time import sleep
 import RPi.GPIO as GPIO
 
 from dotenv import load_dotenv
@@ -33,5 +34,16 @@ def main():
     print(f"Warm water heat pump status: {'ON' if warm_water_heatpump_service.get_status() == GPIO.LOW else 'OFF'}")
     print(f"Heating heat pump 1 status: {'ON' if heating_heatpump_service1.get_status() == GPIO.LOW else 'OFF'}")
     print(f"Heating heat pump 2 status: {'ON' if heating_heatpump_service2.get_status() == GPIO.LOW else 'OFF'}")
+    
+    # sonnen_battery_service.set_disable_discharge()
+    # sonnen_battery_service.refresh_status()
+    # print(f"Battery feed after disabling discharge: {sonnen_battery_service.get_battery_feed()}")
+    
+    # sleep(30)  # Wait for 30 seconds before enabling discharge again
+    
+    # sonnen_battery_service.set_enable_discharge()
+    # sonnen_battery_service.refresh_status()
+    # print(f"Battery feed after enabling discharge: {sonnen_battery_service.get_battery_feed()}")
+
 if __name__ == "__main__":
     main()
