@@ -1,5 +1,6 @@
 import requests
 import math
+import time
 
 class GoEService:
     """Client for reading and updating charger state through the go-e API."""
@@ -44,7 +45,7 @@ class GoEService:
         """
         return self._get_status("err")
 
-    def get_phases(self) -> int:
+    def _get_phases(self) -> int:
         """The configured number of charging phases.
         Returns:
             0 for automatic phase switching,
@@ -63,6 +64,22 @@ class GoEService:
             case _:
                 print(f"Unknown phase mode: {ret}")
                 return -1
+
+    def get_charging_power(self) -> int:
+        """The current charging power in watts as reported by the charger.
+        Returns:
+            The current charging power in watts, or None on internal errors.
+        """
+        phases = self._get_phases()
+        if phases == -1:
+            return None
+        elif phases == 0:
+            # if the charger is in automatic phase switching mode, we assume 3 phases are available
+            phases = 3
+        current_per_phase = self._get_status("amp")
+        if current_per_phase is None:
+            return None
+        return phases * current_per_phase * 230  # convert current in amperes to power in watts assuming 230 V
 
     def _get_status(self, filter):
         """Get a single status value from the charger API.
@@ -113,24 +130,28 @@ class GoEService:
 
     def set_charging_off(self) -> bool:
         """Force charging off."""
-        return self._update_setting("frc", 1)
+        ret = self._update_setting("frc", 1)
+        time.sleep(15)  # wait for the charger to stop charging before returning to avoid issues with subsequent updates
+        return ret
 
     def set_charging_on(self) -> bool:
         """Force charging on."""
-        return self._update_setting("frc", 2)
+        ret = self._update_setting("frc", 2)
+        time.sleep(15)  # wait for the charger to start charging before returning to avoid issues with subsequent updates
+        return ret
 
     def set_charging_default(self) -> bool:
         """Restore the charger's default charging mode."""
         return self._update_setting("frc", 0)
 
-    def set_charging_phases(self, phases) -> bool:
+    def _set_charging_phases(self, phases) -> bool:
         """Set the number of phases used for charging.
         Args:
             phases: Allowed values are 0 for automatic switching, 1, or 3.
         Returns:
             True if the update succeeded, otherwise False.
         """
-        current_phases = self.get_phases()
+        current_phases = self._get_phases()
         is_car_charging = self.is_car_charging()
         charging_stopped = False
         
@@ -159,7 +180,7 @@ class GoEService:
                 self.set_charging_default()
         return ret
 
-    def set_charging_current(self, current) -> bool:
+    def _set_charging_current(self, current) -> bool:
         """Set the charging current in amperes.
         Args:
             current: Charging current in the allowed range from 6 to 16 A.
@@ -173,9 +194,9 @@ class GoEService:
 
     def set_max_charging_power(self) -> bool:
         """Set the charger to maximum power using 3 phases and 16 A per phase."""
-        ret = self.set_charging_phases(3)
+        ret = self._set_charging_phases(3)
         if ret:
-            return self.set_charging_current(16)
+            return self._set_charging_current(16)
         return False
 
     def set_charging_power(self, power) -> bool:
@@ -196,7 +217,7 @@ class GoEService:
             phases_required = 1 if total_current_required < 18 else 3
             current_required = math.floor(min(total_current_required / phases_required, 16))  # the charger supports a maximum of 16 A per phase
             
-            ret = self.set_charging_phases(phases_required)
+            ret = self._set_charging_phases(phases_required)
             if ret:
-                return self.set_charging_current(current_required)
+                return self._set_charging_current(current_required)
         return False

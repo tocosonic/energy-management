@@ -42,6 +42,16 @@ def main():
     print(f"Is car charging allowed from GoE: {goe_service.is_car_charging_allowed()}")
     print(f"Error from GoE: {goe_service.get_error()}")
     
+    print(f"Number of phases: {goe_service._get_phases()}")
+    print(f"Is car charging: {goe_service.is_car_charging()}")
+    print(f"Is car charging allowed: {goe_service.is_car_charging_allowed()}")
+    print(f"Current charging power: {goe_service.get_charging_power()} W")
+
+    # goe_service.set_charging_power(1500)
+    goe_service.set_max_charging_power()
+
+    print(f"Current charging power: {goe_service.get_charging_power()} W")
+    
     # sonnen_battery_service.set_disable_discharge()
     # sonnen_battery_service.refresh_status()
     # print(f"Battery feed after disabling discharge: {sonnen_battery_service.get_battery_feed()}")
