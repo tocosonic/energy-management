@@ -210,7 +210,9 @@ class GoEService:
         """
         total_current_required = power / 230  # convert energy in watts to current in amperes assuming 230 V
         if total_current_required < 6:
-            print(f"Requested power {power} W is too low. Minimum is 1380 W (6 A).")
+            print(f"Requested power {power} W is too low. Minimum is 1380 W (6 A). Turning charging off and setting minimum values.")
+            self.set_charging_power(1380)
+            self.set_charging_off()
             return False
         else:
             # if the required total current is between 6 and 18 A (18 A is the minimum total current for three phases: 3x 6 A), use single phase charging with the required current
@@ -219,5 +221,8 @@ class GoEService:
             
             ret = self._set_charging_phases(phases_required)
             if ret:
-                return self._set_charging_current(current_required)
+                ret = self._set_charging_current(current_required)
+                if(ret):
+                    self.set_charging_on()  # make sure charging is on after successfully updating the settings
+                return ret
         return False

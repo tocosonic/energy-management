@@ -47,8 +47,8 @@ def main():
     print(f"Is car charging allowed: {goe_service.is_car_charging_allowed()}")
     print(f"Current charging power: {goe_service.get_charging_power()} W")
 
-    # goe_service.set_charging_power(1500)
-    goe_service.set_max_charging_power()
+    goe_service.set_charging_power(1000)
+    # goe_service.set_max_charging_power()
 
     print(f"Current charging power: {goe_service.get_charging_power()} W")
     
