@@ -1,10 +1,20 @@
 import sqlite3
-from datetime import datetime
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+
+@dataclass(frozen=True)
+class EnergyStatus:
+    timestamp: datetime
+    production: int
+    consumption: int
+    feed_in: int
 
 class DBService:
-    def __init__(self, db_path):
+    def __init__(self, db_path, energy_status_retention_minutes: int = 30):
         self.db_path = db_path
         self._initialize_database()
+        self.energy_status_retention_minutes = energy_status_retention_minutes
 
     def _initialize_database(self):
         conn = sqlite3.connect(self.db_path)
@@ -13,8 +23,19 @@ class DBService:
             CREATE TABLE IF NOT EXISTS relay_status (
                 id INTEGER PRIMARY KEY NOT NULL,
                 device_name TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
+                timestamp DATETIME NOT NULL,
                 is_on BOOLEAN NOT NULL
+            )
+        ''')
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS energy_status (
+                timestamp DATETIME PRIMARY KEY NOT NULL,
+                production INTEGER NOT NULL,
+                consumption INTEGER NOT NULL,
+                feed_in INTEGER NOT NULL
             )
         ''')
         conn.commit()
@@ -23,7 +44,7 @@ class DBService:
     def create_relay_status(self, id: int, device_name: str, is_on: bool):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now()
         cursor.execute('''
             INSERT OR IGNORE INTO relay_status (id, device_name, timestamp, is_on)
             VALUES (?, ?, ?, ?)
@@ -34,7 +55,7 @@ class DBService:
     def update_relay_status(self, id: int, is_on: bool):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
-        timestamp = datetime.now().isoformat()
+        timestamp = datetime.now()
         cursor.execute('''
             UPDATE relay_status
             SET timestamp = ?, is_on = ?
@@ -54,5 +75,54 @@ class DBService:
         result = cursor.fetchone()
         conn.close()
 
-        # Values are stored using datetime.now().isoformat(), so parse them back.
-        return datetime.fromisoformat(result[0])
+        # Values are stored using datetime.now(), so return them directly.
+        return result[0]
+
+    def create_energy_status(self, production: int, consumption: int, feed_in: int):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        timestamp = datetime.now()
+        cursor.execute('''
+            INSERT INTO energy_status (timestamp, production, consumption, feed_in)
+            VALUES (?, ?, ?, ?)
+        ''', (timestamp, production, consumption, feed_in))
+        conn.commit()
+        conn.close()
+        
+    def get_energy_status_time_series(self, minutes: int) -> list[EnergyStatus]:
+        """Get energy status entries from the last specified number of minutes."""
+        self._clean_up_old_energy_status(self.energy_status_retention_minutes)
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cutoff_time = datetime.now() - timedelta(minutes=minutes)
+        cursor.execute('''
+            SELECT timestamp, production, consumption, feed_in
+            FROM energy_status
+            WHERE timestamp >= ?
+            ORDER BY timestamp DESC
+        ''', (cutoff_time,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [
+            EnergyStatus(
+                timestamp=row[0],
+                production=row[1],
+                consumption=row[2],
+                feed_in=row[3],
+            )
+            for row in rows
+        ]
+        
+    def _clean_up_old_energy_status(self, minutes: int):
+        """Delete energy status entries that are older than the specified number of minutes."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cutoff_time = datetime.now() - timedelta(minutes=minutes)
+        cursor.execute('''
+            DELETE FROM energy_status WHERE timestamp < ?
+        ''', (cutoff_time,))
+        conn.commit()
+        conn.close()
+        

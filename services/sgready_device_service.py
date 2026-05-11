@@ -7,12 +7,14 @@ class SGReadyDeviceService:
     """Service for controlling SG-Ready devices (e.g. heat pumps) via relays connected to the Raspberry Pi.
     The relays are active low, which means that the device is turned on when the relay is set to LOW and turned off when the relay is set to HIGH.
     Valid relay pins are: 5, 6, 13, 16, 19, 20, 21, and 26.
+    Energy consumption can be specified in watts; defaults to 0.
     """
     
-    def __init__(self, db_service: DBService, relay_pin: int, name: str):
+    def __init__(self, db_service: DBService, relay_pin: int, name: str, energy_consumption: int = 0):
         self.db_service = db_service
         self.relay_pin = relay_pin
         self.name = name
+        self.energy_consumption = energy_consumption
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self.relay_pin, GPIO.OUT)
         GPIO.setwarnings(False)

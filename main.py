@@ -16,10 +16,10 @@ def main():
     # Initialize services
     db_service = DBService(db_path=os.getenv("DATABASE_PATH"))
     weather_service = WeatherService(api_key=os.getenv("OPENWEATHER_API_KEY"), latitude=os.getenv("OPENWEATHER_LAT"), longitude=os.getenv("OPENWEATHER_LON"))
-    sonnen_battery_service = SonnenBatteryService(host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
-    warm_water_heatpump_service = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heat Pump")
-    heating_heatpump_service1 = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_HEATING1")), "Panasonic Heating Heat Pump 1")
-    heating_heatpump_service2 = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heat Pump 2")
+    sonnen_battery_service = SonnenBatteryService(db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
+    warm_water_heatpump_service = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heat Pump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
+    heating_heatpump_service1 = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_HEATING1")), "Panasonic Heating Heat Pump 1", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")))
+    heating_heatpump_service2 = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heat Pump 2", int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
     goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"))
 
     relay_test = SGReadyDeviceService(db_service, 16, "Test Relay")
@@ -62,6 +62,8 @@ def main():
     # goe_service.set_max_charging_power()
 
     print(f"Current charging power: {goe_service.get_charging_power()} W")
+    
+    print(f"Minimum grid feed-in in the last 30 minutes: {sonnen_battery_service.get_grid_feed_in_minimum(30)} W")
     
     
     
