@@ -5,15 +5,23 @@ import time
 class GoEService:
     """Client for reading and updating charger state through the go-e API."""
 
-    def __init__(self, host, api_key):
+    def __init__(self, host: str, api_key: str, fixed_charging_user: int, dynamic_charging_user: int):
         """Initialize the service with the charger host and API key."""
         self.host = host
         self.api_key = api_key
+        self.fixed_charging_user = fixed_charging_user
+        self.dynamic_charging_user = dynamic_charging_user
+        self.MINIMUM_ENERGY_CONSUMPTION = 1380  # the minimum energy consumption of the car when charging with 6 A on a single phase, which is the minimum allowed current by the charger   
 
     def get_last_user(self) -> int:
         """Returns:
             The card index of the last authenticated user."""
         return self._get_status("lrc")
+
+    def is_dynamic_charging_user(self) -> bool:
+        """Returns:
+            Whether the last authenticated user is the dynamic charging user."""
+        return self.get_last_user() == self.dynamic_charging_user
 
     def get_car_status(self) -> int:
         """The current status code of the car reported by the charger.
@@ -65,6 +73,13 @@ class GoEService:
                 print(f"Unknown phase mode: {ret}")
                 return -1
 
+    def get_charging_current(self) -> int:
+        """The current charging current in amperes as reported by the charger.
+        Returns:
+            The current charging current in amperes.
+        """
+        return self._get_status("amp")
+
     def get_charging_power(self) -> int:
         """The current charging power in watts as reported by the charger.
         Returns:
@@ -80,6 +95,15 @@ class GoEService:
         if current_per_phase is None:
             return None
         return phases * current_per_phase * 230  # convert current in amperes to power in watts assuming 230 V
+
+    def get_total_power_average(self) -> int:
+        """The 30 seconds total average power in Wh as reported by the charger.
+        Returns:
+            The 30 seconds total average power in Wh
+        """
+        tpa = self._get_status("tpa")
+        # API values can arrive as numeric strings (e.g. "1234.0") or numbers.
+        return int(float(tpa))
 
     def _get_status(self, filter):
         """Get a single status value from the charger API.
@@ -155,22 +179,23 @@ class GoEService:
         is_car_charging = self.is_car_charging()
         charging_stopped = False
         
-        if current_phases != phases and is_car_charging:
-            # turn off charging if changing the number of phases to avoid issues with the car
-            self.set_charging_off()
-            charging_stopped = True
+        if current_phases != phases:
+            if is_car_charging:
+                # turn off charging if changing the number of phases to avoid issues with the car
+                self.set_charging_off()
+                charging_stopped = True
         
-        ret = False
-        match phases:
-            case 0:
-                ret = self._update_setting("psm", 0)
-            case 1:
-                ret = self._update_setting("psm", 1)
-            case 3:
-                ret = self._update_setting("psm", 2)
-            case _:
-                print(f"Invalid number of phases: {phases}. Only 0 (auto), 1 and 3 are allowed.")
-                ret = False
+            ret = False
+            match phases:
+                case 0:
+                    ret = self._update_setting("psm", 0)
+                case 1:
+                    ret = self._update_setting("psm", 1)
+                case 3:
+                    ret = self._update_setting("psm", 2)
+                case _:
+                    print(f"Invalid number of phases: {phases}. Only 0 (auto), 1 and 3 are allowed.")
+                    ret = False
         
         # turn on charging again if it was on before
         if charging_stopped:
@@ -185,12 +210,14 @@ class GoEService:
         Args:
             current: Charging current in the allowed range from 6 to 16 A.
         Returns:
-            True if the update succeeded, otherwise False.
+            True if the update was applied and succeeded, otherwise False.
         """
         if current < 6 or current > 16:
             print(f"Invalid charging current: {current}. Only values between 6 and 16 are allowed.")
             return False
-        return self._update_setting("amp", current)
+        elif self._get_charging_current() != current:
+            return self._update_setting("amp", current)
+        return False
 
     def set_max_charging_power(self) -> bool:
         """Set the charger to maximum power using 3 phases and 16 A per phase."""
@@ -199,7 +226,7 @@ class GoEService:
             return self._set_charging_current(16)
         return False
 
-    def set_charging_power(self, power) -> bool:
+    def set_charging_power(self, power: int) -> bool:
         """Set the charger to the indicated power. Phases and current are selected automatically based on the requested power. The method will try to use as few phases as possible while keeping the current per phase within the allowed range of 6 to 16 A.
         Furthermore, the requested power must be at least 1380 W (6 A on a single phase) and at most 11040 W (16 A on three phases).
         The effective power will never exceed the requested power, but may be lower due to the discrete number of phases and current steps supported by the charger.
@@ -210,9 +237,9 @@ class GoEService:
         """
         total_current_required = power / 230  # convert energy in watts to current in amperes assuming 230 V
         if total_current_required < 6:
-            print(f"Requested power {power} W is too low. Minimum is 1380 W (6 A). Turning charging off and setting minimum values.")
-            self.set_charging_power(1380)
+            print(f"Requested power {power} W is too low. Minimum is {self.MINIMUM_ENERGY_CONSUMPTION} W (6 A). Turning charging off and setting minimum values.")
             self.set_charging_off()
+            self.set_charging_power(self.MINIMUM_ENERGY_CONSUMPTION)
             return False
         else:
             # if the required total current is between 6 and 18 A (18 A is the minimum total current for three phases: 3x 6 A), use single phase charging with the required current

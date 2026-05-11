@@ -78,11 +78,17 @@ class SonnenBatteryService:
         even if it is charged. This is useful to prevent discharging the battery when the car is charging
         with max power to avoid sucking the battery empty.
         """
-        self._set_discharge_off(True)
+        if not self.is_discharge_disabled():
+            self._set_discharge_off(True)
         
     def set_enable_discharge(self):
         """Enable discharging of the battery, allowing it to provide energy for home consumption."""
-        self._set_discharge_off(False)
+        if self.is_discharge_disabled():
+           self._set_discharge_off(False)
+    
+    def is_discharge_disabled(self) -> bool:
+        """Check if discharging of the battery is currently disabled."""
+        return self.sonnen_status["OperatingMode"] == 1
     
     def _set_discharge_off(self, disable: bool):
         try:
@@ -92,8 +98,10 @@ class SonnenBatteryService:
                 "Content-Type": "application/json"
             }
             if disable:
+                # turn discharge off by setting the operating mode to 1
                 data = {"EM_OperatingMode": 1}
             else:
+                # turn discharge on by setting the operating mode to 2 (normal mode)
                 data = {"EM_OperatingMode": 2}
             
             response = requests.put(url, headers=headers, json=data)

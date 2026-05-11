@@ -1,0 +1,148 @@
+import os
+
+from dataclasses import dataclass
+from time import sleep
+from dotenv import load_dotenv
+from services.database_service import DBService, EnergyStatus
+from services.goe_service import GoEService
+from services.sonnen_battery_service import SonnenBatteryService
+from services.weather_service import WeatherService
+from services.sgready_device_service import SGReadyDeviceService
+
+@dataclass(frozen=True)
+class ControlStructure:
+    """Data class for defining control structures for the energy management application.
+    This can be used to define rules for when to turn on or off certain devices based on the current energy status, weather conditions, and Sonnen battery status.
+    """
+    START_WW_WAIT_TIME: int = 5
+    START_HEATING1_WAIT_TIME: int = 5
+    START_HEATING2_WAIT_TIME: int = 5
+    START_CAR_CHARGING_WAIT_TIME: int = 5
+    STOP_WW_WAIT_TIME: int = 15
+    STOP_HEATING1_WAIT_TIME: int = 10
+    STOP_HEATING2_WAIT_TIME: int = 5
+    STOP_CAR_CHARGING_WAIT_TIME: int = 15
+    NON_USED_ENERGY_BUFFER: int = 1000  # Buffer in watts to account for fluctuations in energy production and consumption. This means that the application will only turn on devices if there is at least this much excess energy available, and will only turn off devices if the energy deficit is at least this much.
+
+class EnergyManagementApplication:
+    def __init__(self):
+        load_dotenv()  # Load environment variables from .env file
+        self.db_service = DBService(db_path=os.getenv("DATABASE_PATH"))
+        self.weather_service = WeatherService(api_key=os.getenv("OPENWEATHER_API_KEY"), latitude=os.getenv("OPENWEATHER_LAT"), longitude=os.getenv("OPENWEATHER_LON"))
+        self.sonnen_battery_service = SonnenBatteryService(self.db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
+        self.warm_water_heatpump_service = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heat Pump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
+        self.heating_heatpump_service1 = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), "Panasonic Heating Heat Pump 1", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")))
+        self.heating_heatpump_service2 = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heat Pump 2", int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
+        self.goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
+        self._init_control_structure()
+
+    def _init_control_structure(self):
+        """Initializes the control structure for the energy management application."""
+        self.control_structure = ControlStructure(
+            START_WW_WAIT_TIME = int(os.getenv("START_WW_WAIT_TIME")),
+            START_HEATING1_WAIT_TIME = int(os.getenv("START_HEATING1_WAIT_TIME")),
+            START_HEATING2_WAIT_TIME = int(os.getenv("START_HEATING2_WAIT_TIME")),
+            START_CAR_CHARGING_WAIT_TIME = int(os.getenv("START_CAR_CHARGING_WAIT_TIME")),
+            STOP_WW_WAIT_TIME = int(os.getenv("STOP_WW_WAIT_TIME")),
+            STOP_HEATING1_WAIT_TIME = int(os.getenv("STOP_HEATING1_WAIT_TIME")),
+            STOP_HEATING2_WAIT_TIME = int(os.getenv("STOP_HEATING2_WAIT_TIME")),
+            STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME")),
+            NON_USED_ENERGY_BUFFER = int(os.getenv("NON_USED_ENERGY_BUFFER"))
+        )
+
+    def run(self):
+        """Main loop of the energy management application. This will continuously monitor the energy status, weather conditions, and Sonnen battery status, and control the devices accordingly."""
+        while True:
+            # Refresh the status of the Sonnen battery
+            self.sonnen_battery_service.refresh_status()
+
+            # Turn on devices if there is enough excess energy available, starting with the most important device (warm water heat pump) and then the heating heat pumps. The car charging will be turned on if there is enough excess energy available after turning on the heat pumps.
+            # WW heatpump
+            if not self.turn_on_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME):
+                # Heating 1
+                if not self.turn_on_heatpump(self.heating_heatpump_service1, self.control_structure.START_HEATING1_WAIT_TIME):
+                    # Heating 2
+                    self.turn_on_heatpump(self.heating_heatpump_service2, self.control_structure.START_HEATING2_WAIT_TIME)
+
+            self.update_car_charging(self.control_structure.START_CAR_CHARGING_WAIT_TIME, self.control_structure.STOP_CAR_CHARGING_WAIT_TIME)
+
+            sleep(60)  # Sleep for 60 seconds before checking again
+    
+    def turn_on_heatpump(self, device: SGReadyDeviceService, wait_time: int) -> bool:
+        """
+        Turn on a heat pump.
+        Args:
+            device: The SGReadyDeviceService instance representing the heat pump to be turned on.
+            wait_time: The time in minutes to look back for the minimum grid feed-in value to determine if there is enough excess energy to turn on the device.
+        Returns:
+            True if the device was turned on, False otherwise.
+        """
+        if not device.is_on:
+            min = self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)
+            if min - self.control_structure.NON_USED_ENERGY_BUFFER >= device.energy_consumption: 
+                device.turn_on()
+                return True
+        
+        return False
+        
+    def update_car_charging(self, start_wait_time: int, stop_wait_time: int) -> bool:
+        """Update on car charging through the GoE API.
+        Args:
+            start_wait_time: The time in minutes to look back for the minimum grid feed-in value to determine if there is enough excess energy to turn on the car charging.
+            stop_wait_time: The time in minutes to look back for the minimum grid feed-in value to determine if there is enough excess energy to turn off the car charging.
+        Returns:
+            True if the car charging was turned on or modified and not turned off, False otherwise.
+        """
+        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging():
+            print(f"Car charging is currently allowed or the car is charging.")
+        
+            if self.goe_service.is_dynamic_charging_user():
+                print(f"The last authenticated user is the dynamic charging user.")
+                
+                min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
+                available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER
+                print(f"Minimum grid feed-in in the last {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes: {min_power} W, available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_charging_power()} W")
+                if available_power >= self.goe_service.MINIMUM_ENERGY_CONSUMPTION:
+                    # wait 5 minutes before changing the car charging power to make sure that the energy status is stable and there is actually enough excess energy available for car charging. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
+                    # TODO: implement waiting
+                    
+                    return self.goe_service.set_charging_power(available_power)
+                else:
+                    print(f"Not enough excess energy available to turn on car charging. Available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_charging_power()} W")
+                    # wait x minutes before switching off the car charging to make sure that the energy status is stable and there is actually not enough excess energy available. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
+                    
+                    return self.goe_service.set_charging_power(0)    
+                
+                
+                # If the last authenticated user is the dynamic charging user, we will control the car charging based on the current energy status and the control structure.
+                # if self.goe_service.is_car_charging_allowed():
+                #     # return self.turn_on_heatpump(self.goe_service, start_wait_time)
+                # else:
+                #     # Check if we need to turn off the car charging due to insufficient excess energy. We will only turn off the car charging if it is currently on and there is not enough excess energy available for at least the specified stop wait time.
+                #     if self.goe_service.is_car_charging() and self.sonnen_battery_service.get_grid_feed_in_minimum(stop_wait_time) + self.control_structure.NON_USED_ENERGY_BUFFER < self.goe_service.energy_consumption:
+                #         self.goe_service.turn_off()
+                #         return True
+            else:
+                print(f"The last authenticated user is the fixed charging user.")
+                # If the last authenticated user is the fixed charging user, we will turn on the car charging with max. power and disable discharging of the battery.
+                # TODO check the size of tpa (1/120 of the loaded energy?)
+                if self.goe_service.get_total_power_average() > 5:
+                    self.sonnen_battery_service.set_disable_discharge()
+                else:
+                    self.sonnen_battery_service.set_enable_discharge()
+                
+                return self.goe_service.set_max_charging_power()
+                
+        else:
+            print(f"Car charging is currently not allowed and the car is not charging.")
+            self.sonnen_battery_service.set_enable_discharge()
+        
+        
+        # if not self.car_charging_service.is_on:
+        #     min = self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)
+        #     if min + self.control_structure.NON_USED_ENERGY_BUFFER >= self.car_charging_service.energy_consumption: 
+        #         self.car_charging_service.turn_on()
+        #         return True
+        
+        return False
+    

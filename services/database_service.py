@@ -11,7 +11,7 @@ class EnergyStatus:
     feed_in: int
 
 class DBService:
-    def __init__(self, db_path, energy_status_retention_minutes: int = 30):
+    def __init__(self, db_path, energy_status_retention_minutes: int = 60):
         self.db_path = db_path
         self._initialize_database()
         self.energy_status_retention_minutes = energy_status_retention_minutes
