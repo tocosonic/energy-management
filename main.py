@@ -67,7 +67,7 @@ def main():
     # # goe_service.set_charging_power(1000)
     # # goe_service.set_max_charging_power()
 
-    # print(f"Current charging power: {goe_service.get_charging_power()} W")
+    # print(f"Current charging power: {goe_service.get_configured_charging_power()} W")
     
     # print(f"Minimum grid feed-in in the last 30 minutes: {sonnen_battery_service.get_grid_feed_in_minimum(30)} W")
     
