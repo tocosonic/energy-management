@@ -1,6 +1,16 @@
+from enum import Enum
+
 import requests
 import math
 import time
+
+class CarStatus(Enum):
+    UNKNOWN_ERROR = 0
+    IDLE = 1
+    CHARGING = 2
+    WAIT_CAR = 3
+    COMPLETE = 4
+    ERROR = 5
 
 class GoEService:
     """Client for reading and updating charger state through the go-e API."""
@@ -23,18 +33,25 @@ class GoEService:
             Whether the last authenticated user is the dynamic charging user."""
         return self.get_last_user() == self.dynamic_charging_user
 
-    def get_car_status(self) -> int:
+    def get_car_status(self) -> CarStatus:
         """The current status code of the car reported by the charger.
         Returns:
             None on internal errors.
             Values are: Unknown/Error=0, Idle=1, Charging=2, WaitCar=3,
             Complete=4, Error=5.
         """
-        return self._get_status("car")
+        status = self._get_status("car")
+        if status is None:
+            return CarStatus.UNKNOWN_ERROR
+        return CarStatus(status)
 
     def is_car_charging(self) -> bool:
         """Return whether the charger currently reports an active charging session."""
-        return self.get_car_status() == 2
+        return self.get_car_status() == CarStatus.CHARGING
+
+    def is_car_charging_complete(self) -> bool:
+        """Return whether the charger currently reports a completed charging session."""
+        return self.get_car_status() == CarStatus.COMPLETE
 
     def is_car_charging_allowed(self) -> bool:
         """Return whether charging is currently allowed by the charger."""
@@ -80,10 +97,10 @@ class GoEService:
         """
         return self._get_status("amp")
 
-    def get_charging_power(self) -> int:
-        """The current charging power in watts as reported by the charger.
+    def get_configured_charging_power(self) -> int:
+        """The currently configured charging power in watts as reported by the charger.
         Returns:
-            The current charging power in watts, or None on internal errors.
+            The currently configured charging power in watts, or None on internal errors.
         """
         phases = self._get_phases()
         if phases == -1:
@@ -91,10 +108,19 @@ class GoEService:
         elif phases == 0:
             # if the charger is in automatic phase switching mode, we assume 3 phases are available
             phases = 3
-        current_per_phase = self._get_status("amp")
+        current_per_phase = self.get_charging_current()
         if current_per_phase is None:
             return None
         return phases * current_per_phase * 230  # convert current in amperes to power in watts assuming 230 V
+
+    def get_current_charging_power(self) -> int:
+        """The current effective charging power in watts as reported by the charger. This is the actual power being delivered to the car.
+        Returns:
+            The current effective charging power in watts.
+        """
+        if self.is_car_charging():
+            return self.get_configured_charging_power()
+        return 0
 
     def get_total_power_average(self) -> int:
         """The 30 seconds total average power in Wh as reported by the charger.

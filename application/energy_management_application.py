@@ -2,8 +2,10 @@ import os
 
 from dataclasses import dataclass
 from time import sleep
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from services.database_service import DBService, EnergyStatus
+from services.database_service import DBService
+from services.database_service import ChargerAction
 from services.goe_service import GoEService
 from services.sonnen_battery_service import SonnenBatteryService
 from services.weather_service import WeatherService
@@ -85,34 +87,58 @@ class EnergyManagementApplication:
         
         return False
         
-    def update_car_charging(self, start_wait_time: int, stop_wait_time: int) -> bool:
+    def update_car_charging(self, start_wait_time: int, stop_wait_time: int) -> ChargerAction:
         """Update on car charging through the GoE API.
         Args:
             start_wait_time: The time in minutes to look back for the minimum grid feed-in value to determine if there is enough excess energy to turn on the car charging.
             stop_wait_time: The time in minutes to look back for the minimum grid feed-in value to determine if there is enough excess energy to turn off the car charging.
         Returns:
-            True if the car charging was turned on or modified and not turned off, False otherwise.
+            The charger action that was actually performed.
         """
-        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging():
-            print(f"Car charging is currently allowed or the car is charging.")
+        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete():
+            print(f"Car charging is currently allowed or the car is charging or charging was completed.")
         
-            if self.goe_service.is_dynamic_charging_user():
+            if self.goe_service.is_car_charging_complete():
+                print(f"Car charging was completed.")
+                # Turn on the battery discharge if the charger is not charging with significant power.
+                self.sonnen_battery_service.set_enable_discharge()
+                self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED)
+                return ChargerAction.CHARGING_STOPPED
+            elif self.goe_service.is_dynamic_charging_user():
                 print(f"The last authenticated user is the dynamic charging user.")
                 
                 min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
-                available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER
-                print(f"Minimum grid feed-in in the last {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes: {min_power} W, available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_charging_power()} W")
+                available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + self.goe_service.get_current_charging_power()
+                print(f"Minimum grid feed-in in the last {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes: {min_power} W, available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
                 if available_power >= self.goe_service.MINIMUM_ENERGY_CONSUMPTION:
-                    # wait 5 minutes before changing the car charging power to make sure that the energy status is stable and there is actually enough excess energy available for car charging. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
-                    # TODO: implement waiting
-                    
-                    return self.goe_service.set_charging_power(available_power)
+                    # wait x minutes before changing the car charging power to make sure that the energy status is stable and there is actually enough excess energy available for car charging. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
+                    self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING)
+
+                    charging_request_time = self.db_service.get_goe_action_timestamp(ChargerAction.REQUEST_DYNAMIC_CHARGING)
+                    if charging_request_time is not None:
+                        time_since_action = (datetime.now() - charging_request_time).total_seconds() / 60
+                        if time_since_action >= self.control_structure.START_CAR_CHARGING_WAIT_TIME:
+                            if self.goe_service.set_charging_power(available_power):
+                                self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING)
+                                return ChargerAction.DYNAMIC_CHARGING
+
+                    print(f"Waiting {self.control_structure.START_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before setting the car charging power to {available_power} W to make sure that the energy status is stable.")
+                    return ChargerAction.REQUEST_DYNAMIC_CHARGING
                 else:
-                    print(f"Not enough excess energy available to turn on car charging. Available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_charging_power()} W")
+                    print(f"Not enough excess energy available to turn on car charging. Available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
                     # wait x minutes before switching off the car charging to make sure that the energy status is stable and there is actually not enough excess energy available. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
-                    
-                    return self.goe_service.set_charging_power(0)    
-                
+                    self.db_service.create_goe_action(ChargerAction.REQUEST_STOP_CHARGING)
+
+                    stop_charging_time = self.db_service.get_goe_action_timestamp(ChargerAction.REQUEST_STOP_CHARGING)
+                    if stop_charging_time is not None:
+                        time_since_action = (datetime.now() - stop_charging_time).total_seconds() / 60
+                        if time_since_action >= self.control_structure.STOP_CAR_CHARGING_WAIT_TIME:
+                            if self.goe_service.set_charging_power(0):
+                                self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED)
+                                return ChargerAction.CHARGING_STOPPED
+
+                    print(f"Waiting {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before stopping the car charging to make sure that the energy status is stable.")
+                    return ChargerAction.REQUEST_STOP_CHARGING
                 
                 # If the last authenticated user is the dynamic charging user, we will control the car charging based on the current energy status and the control structure.
                 # if self.goe_service.is_car_charging_allowed():
@@ -127,22 +153,25 @@ class EnergyManagementApplication:
                 # If the last authenticated user is the fixed charging user, we will turn on the car charging with max. power and disable discharging of the battery.
                 # TODO check the size of tpa (1/120 of the loaded energy?)
                 if self.goe_service.get_total_power_average() > 5:
+                    # Only turn off the battery if the charger is actually charging with a significant amount of power. 
                     self.sonnen_battery_service.set_disable_discharge()
                 else:
+                    # Turn on the battery discharge if the charger is not charging with significant power.
                     self.sonnen_battery_service.set_enable_discharge()
+
+                if self.goe_service.is_car_charging() or self.goe_service.is_car_charging_allowed():
+                    if self.goe_service.set_max_charging_power():
+                        print(f"Car charging set to max power.")
+                        self.db_service.create_goe_action(ChargerAction.MAX_CHARGING)
+                        return ChargerAction.MAX_CHARGING
                 
-                return self.goe_service.set_max_charging_power()
+                print(f"This code should not be reached: requesting max charging but setting max charging was not successful.")
+                self.db_service.create_goe_action(ChargerAction.REQUEST_MAX_CHARGING)
+                return ChargerAction.REQUEST_MAX_CHARGING
                 
         else:
             print(f"Car charging is currently not allowed and the car is not charging.")
             self.sonnen_battery_service.set_enable_discharge()
-        
-        
-        # if not self.car_charging_service.is_on:
-        #     min = self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)
-        #     if min + self.control_structure.NON_USED_ENERGY_BUFFER >= self.car_charging_service.energy_consumption: 
-        #         self.car_charging_service.turn_on()
-        #         return True
-        
-        return False
+            self.db_service.create_goe_action(ChargerAction.NO_ACTION)
+            return ChargerAction.NO_ACTION
     
