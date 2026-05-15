@@ -9,15 +9,25 @@ from application.energy_management_application import EnergyManagementApplicatio
 
 from services.goe_service import GoEService
 from services.sonnen_battery_service import SonnenBatteryService
+from services.wago_energy_meter import WagoEnergyMeter
 from services.weather_service import WeatherService
 from services.sgready_device_service import SGReadyDeviceService
 from services.database_service import DBService
 
 def main():
     app = EnergyManagementApplication()
-    app.run()
+    # app.run()
     
-    # load_dotenv()  # Load environment variables from .env file
+    
+    
+    load_dotenv()  # Load environment variables from .env file
+
+    em = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
+    total_energy = em.get_total_energy()
+    print(f"Total energy: {total_energy} KWh")
+    
+    current_power = em.get_current_power()
+    print(f"Current power: {current_power} kW")
 
     # # Initialize services
     # db_service = DBService(db_path=os.getenv("DATABASE_PATH"))

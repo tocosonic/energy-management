@@ -68,6 +68,17 @@ class EnergyManagementApplication:
 
             self.update_car_charging(self.control_structure.START_CAR_CHARGING_WAIT_TIME, self.control_structure.STOP_CAR_CHARGING_WAIT_TIME)
 
+            # Check whether or no the heatpumps need to be turned off due to insufficient excess energy. We will only turn off the heat pumps if they are currently on and there is not enough excess energy available for at least the specified stop wait time.
+            if self.warm_water_heatpump_service.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_WW_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.warm_water_heatpump_service.energy_consumption:
+                print(f"Turning off {self.warm_water_heatpump_service.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {self.control_structure.STOP_WW_WAIT_TIME} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_WW_WAIT_TIME)} W, energy consumption of the device: {self.warm_water_heatpump_service.energy_consumption} W")
+                self.warm_water_heatpump_service.turn_off()
+            if self.heating_heatpump_service1.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING1_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.heating_heatpump_service1.energy_consumption:
+                print(f"Turning off {self.heating_heatpump_service1.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {self.control_structure.STOP_HEATING1_WAIT_TIME} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING1_WAIT_TIME)} W, energy consumption of the device: {self.heating_heatpump_service1.energy_consumption} W")
+                self.heating_heatpump_service1.turn_off()
+            if self.heating_heatpump_service2.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING2_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.heating_heatpump_service2.energy_consumption:
+                print(f"Turning off {self.heating_heatpump_service2.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {self.control_structure.STOP_HEATING2_WAIT_TIME} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING2_WAIT_TIME)} W, energy consumption of the device: {self.heating_heatpump_service2.energy_consumption} W")
+                self.heating_heatpump_service2.turn_off()
+
             sleep(60)  # Sleep for 60 seconds before checking again
     
     def turn_on_heatpump(self, device: SGReadyDeviceService, wait_time: int) -> bool:
@@ -81,10 +92,12 @@ class EnergyManagementApplication:
         """
         if not device.is_on:
             min = self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)
-            if min - self.control_structure.NON_USED_ENERGY_BUFFER >= device.energy_consumption: 
+            if min - self.control_structure.NON_USED_ENERGY_BUFFER >= device.energy_consumption:
+                print(f"Turning on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {min} W, energy consumption of the device: {device.energy_consumption} W")
                 device.turn_on()
                 return True
         
+        print(f"Not turning on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)} W, energy consumption of the device: {device.energy_consumption} W")
         return False
         
     def update_car_charging(self, start_wait_time: int, stop_wait_time: int) -> ChargerAction:
@@ -154,9 +167,11 @@ class EnergyManagementApplication:
                 # TODO check the size of tpa (1/120 of the loaded energy?)
                 if self.goe_service.get_total_power_average() > 5:
                     # Only turn off the battery if the charger is actually charging with a significant amount of power. 
+                    print(f"Car is charging with significant power ({self.goe_service.get_total_power_average()} W), turning off battery discharge to prioritize car charging.")
                     self.sonnen_battery_service.set_disable_discharge()
                 else:
                     # Turn on the battery discharge if the charger is not charging with significant power.
+                    print(f"Car is not charging with significant power ({self.goe_service.get_total_power_average()} W), enabling battery discharge.")
                     self.sonnen_battery_service.set_enable_discharge()
 
                 if self.goe_service.is_car_charging() or self.goe_service.is_car_charging_allowed():

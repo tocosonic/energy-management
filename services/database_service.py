@@ -20,6 +20,13 @@ class ChargerAction(Enum):
     REQUEST_STOP_CHARGING = 5
     CHARGING_STOPPED = 6
 
+class HeatPumpAction(Enum):
+    NO_ACTION = 0
+    REQUEST_HEAT_PUMP_ON = 1
+    REQUEST_HEAT_PUMP_OFF = 2
+    HEAT_PUMP_ON = 3
+    HEAT_PUMP_OFF = 4
+
 class DBService:
     def __init__(self, db_path, energy_status_retention_minutes: int = 60):
         self.db_path = db_path
@@ -53,6 +60,33 @@ class DBService:
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS goe_action (
+                action INTEGER PRIMARY KEY NOT NULL,
+                timestamp DATETIME NOT NULL
+            )
+        ''')
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ww_heat_pump_action (
+                action INTEGER PRIMARY KEY NOT NULL,
+                timestamp DATETIME NOT NULL
+            )
+        ''')
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS heating1_heat_pump_action (
+                action INTEGER PRIMARY KEY NOT NULL,
+                timestamp DATETIME NOT NULL
+            )
+        ''')
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS heating2_heat_pump_action (
                 action INTEGER PRIMARY KEY NOT NULL,
                 timestamp DATETIME NOT NULL
             )
@@ -93,6 +127,66 @@ class DBService:
         cursor = conn.cursor()
         cursor.execute('''
             SELECT timestamp FROM goe_action WHERE action = ?
+        ''', (action.value,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return result[0]
+        else:
+            return None
+
+    def create_ww_heat_pump_action(self, action: HeatPumpAction):
+        self._create_heat_pump_action("ww_heat_pump_action", action)
+        
+    def get_ww_heat_pump_action_timestamp(self, action: HeatPumpAction) -> datetime:
+        return self._get_heat_pump_action_timestamp("ww_heat_pump_action", action)
+    
+    def create_heating1_heat_pump_action(self, action: HeatPumpAction):
+        self._create_heat_pump_action("heating1_heat_pump_action", action)
+        
+    def get_heating1_heat_pump_action_timestamp(self, action: HeatPumpAction) -> datetime:
+        return self._get_heat_pump_action_timestamp("heating1_heat_pump_action", action)
+    
+    def create_heating2_heat_pump_action(self, action: HeatPumpAction):
+        self._create_heat_pump_action("heating2_heat_pump_action", action)
+        
+    def get_heating2_heat_pump_action_timestamp(self, action: HeatPumpAction) -> datetime:
+        return self._get_heat_pump_action_timestamp("heating2_heat_pump_action", action)
+
+    def _create_heat_pump_action(self, table_name: str, action: HeatPumpAction):
+        """Create the current active heat pump action in the database. Only one action can be active at a time for each heat pump."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(f'''
+            SELECT action FROM {table_name} LIMIT 1
+        ''')
+        existing = cursor.fetchone()
+
+        # If this action is already active, keep the original timestamp.
+        if existing and existing[0] == action.value:
+            conn.close()
+            return
+
+        # Keep only one active action row at any time.
+        cursor.execute(f'''
+            DELETE FROM {table_name}
+        ''')
+
+        timestamp = datetime.now()
+        cursor.execute(f'''
+            INSERT INTO {table_name} (action, timestamp)
+            VALUES (?, ?)
+        ''', (action.value, timestamp))
+        conn.commit()
+        conn.close()
+        
+    def _get_heat_pump_action_timestamp(self, table_name: str, action: HeatPumpAction) -> datetime:
+        """Get the timestamp of when a specific heat pump action was last set."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(f'''
+            SELECT timestamp FROM {table_name} WHERE action = ?
         ''', (action.value,))
         result = cursor.fetchone()
         conn.close()
