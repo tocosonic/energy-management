@@ -22,6 +22,22 @@ class GoEService:
         self.fixed_charging_user = fixed_charging_user
         self.dynamic_charging_user = dynamic_charging_user
         self.MINIMUM_ENERGY_CONSUMPTION = 1380  # the minimum energy consumption of the car when charging with 6 A on a single phase, which is the minimum allowed current by the charger   
+        self.CHARGER_SN = self._get_status("sse")  # the serial number of the charger, which can be used to identify the charger
+        self.CHARGER_NAME = self._get_status("fna")  # the name of the charger
+
+    def get_last_user_with_name(self) -> tuple[int, str]:
+        """Returns:
+            The card index of the last authenticated user and the corresponding user name."""
+        last_user = self.get_last_user()
+        last_user_name = self.get_user_name(last_user)
+        return last_user, last_user_name
+
+    def get_user_name(self, user_id: int) -> str:
+        """Returns:
+            The user name corresponding to the given card index of the user."""
+        filter = f"c{user_id}n"  # the filter for the user name of the given user ID. The API returns the user name for the last authenticated user with this filter, so it is important to provide the correct user ID to get the correct user name.
+        user_name = self._get_status(filter)
+        return user_name
 
     def get_last_user(self) -> int:
         """Returns:
@@ -204,6 +220,7 @@ class GoEService:
         current_phases = self._get_phases()
         is_car_charging = self.is_car_charging()
         charging_stopped = False
+        ret = False
         
         if current_phases != phases:
             if is_car_charging:
@@ -211,7 +228,6 @@ class GoEService:
                 self.set_charging_off()
                 charging_stopped = True
         
-            ret = False
             match phases:
                 case 0:
                     ret = self._update_setting("psm", 0)
@@ -223,12 +239,12 @@ class GoEService:
                     print(f"Invalid number of phases: {phases}. Only 0 (auto), 1 and 3 are allowed.")
                     ret = False
         
-        # turn on charging again if it was on before
-        if charging_stopped:
-            if is_car_charging:
-                self.set_charging_on()
-            else:
-                self.set_charging_default()
+            # turn on charging again if it was on before
+            if charging_stopped:
+                if is_car_charging:
+                    self.set_charging_on()
+                else:
+                    self.set_charging_default()
         return ret
 
     def _set_charging_current(self, current) -> bool:

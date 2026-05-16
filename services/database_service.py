@@ -61,7 +61,8 @@ class DBService:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS goe_action (
                 action INTEGER PRIMARY KEY NOT NULL,
-                timestamp DATETIME NOT NULL
+                timestamp DATETIME NOT NULL,
+                session_id INTEGER
             )
         ''')
         conn.commit()
@@ -92,9 +93,68 @@ class DBService:
             )
         ''')
         conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS car_charging_report (
+                id INTEGER PRIMARY KEY NOT NULL,
+                charger_sn TEXT NOT NULL,
+                charger_name TEXT NOT NULL,
+                rfid_chip_id INTEGER NOT NULL,
+                rfid_chip_name TEXT NOT NULL,
+                start_time DATETIME NOT NULL,
+                end_time DATETIME,
+                duration_minutes INTEGER,
+                energy_meter_start INTEGER NOT NULL,
+                energy_meter_end INTEGER,
+                energy_consumed_wh INTEGER
+            )
+        ''')
+        conn.commit()
         conn.close()
 
-    def create_goe_action(self, action: ChargerAction):
+    def create_car_charging_entry(self, charger_sn: str, charger_name: str, rfid_chip_id: int, rfid_chip_name: str, energy_meter_start: int) -> int:
+        """Create a new car charging entry in the database when a charging session starts. Returns the session ID of the created entry."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        start_time = datetime.now()
+        cursor.execute('''
+            INSERT INTO car_charging_report (charger_sn, charger_name, rfid_chip_id, rfid_chip_name, start_time, energy_meter_start)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (charger_sn, charger_name, rfid_chip_id, rfid_chip_name, start_time, energy_meter_start))
+        conn.commit()
+        session_id = cursor.lastrowid
+        conn.close()
+        return session_id
+
+    def end_car_charging_entry(self, session_id: int, energy_meter_end: int):
+        """Update a car charging entry in the database when a charging session ends. It sets the end time, calculates the duration and energy consumed, and updates the entry."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        end_time = datetime.now()
+        cursor.execute('''
+            SELECT start_time, energy_meter_start FROM car_charging_report WHERE id = ?
+        ''', (session_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            print(f"No car charging entry found with session ID {session_id}")
+            conn.close()
+            return
+
+        start_time, energy_meter_start = result
+        duration_minutes = int((end_time - datetime.fromisoformat(start_time)).total_seconds() / 60)
+        energy_consumed_wh = max(0, energy_meter_end - energy_meter_start)  # Energy consumed in Wh
+
+        cursor.execute('''
+            UPDATE car_charging_report
+            SET end_time = ?, duration_minutes = ?, energy_meter_end = ?, energy_consumed_wh = ?
+            WHERE id = ?
+        ''', (end_time, duration_minutes, energy_meter_end, energy_consumed_wh, session_id))
+        conn.commit()
+        conn.close()
+
+    def create_goe_action(self, action: ChargerAction, session_id: int = None):
         """Create the current active GoE action in the database. Only one action can be active at a time."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -115,19 +175,34 @@ class DBService:
 
         timestamp = datetime.now()
         cursor.execute('''
-            INSERT INTO goe_action (action, timestamp)
-            VALUES (?, ?)
-        ''', (action.value, timestamp))
+            INSERT INTO goe_action (action, timestamp, session_id)
+            VALUES (?, ?, ?)
+        ''', (action.value, timestamp, session_id))
         conn.commit()
         conn.close()
 
-    def get_goe_action_timestamp(self, action: ChargerAction) -> datetime:
+    def get_goe_action_timestamp(self) -> datetime:
         """Get the timestamp of when a specific GoE action was last set."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT timestamp FROM goe_action WHERE action = ?
-        ''', (action.value,))
+            SELECT timestamp FROM goe_action
+        ''', )
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return result[0]
+        else:
+            return None
+
+    def get_goe_action_session_id(self) -> int:
+        """Get the session ID associated with a specific GoE action."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT session_id FROM goe_action
+        ''', )
         result = cursor.fetchone()
         conn.close()
 

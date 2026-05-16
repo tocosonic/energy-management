@@ -23,10 +23,10 @@ def main():
     load_dotenv()  # Load environment variables from .env file
 
     em = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
-    total_energy = em.get_total_energy()
+    total_energy = em.get_total_energy_kwh()
     print(f"Total energy: {total_energy} KWh")
     
-    current_power = em.get_current_power()
+    current_power = em.get_current_power_kw()
     print(f"Current power: {current_power} kW")
 
     # # Initialize services

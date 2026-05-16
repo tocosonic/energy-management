@@ -10,6 +10,7 @@ from services.goe_service import GoEService
 from services.sonnen_battery_service import SonnenBatteryService
 from services.weather_service import WeatherService
 from services.sgready_device_service import SGReadyDeviceService
+from services.wago_energy_meter import WagoEnergyMeter
 
 @dataclass(frozen=True)
 class ControlStructure:
@@ -36,6 +37,7 @@ class EnergyManagementApplication:
         self.heating_heatpump_service1 = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), "Panasonic Heating Heat Pump 1", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")))
         self.heating_heatpump_service2 = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heat Pump 2", int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
         self.goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
+        self.energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
         self._init_control_structure()
 
     def _init_control_structure(self):
@@ -115,7 +117,8 @@ class EnergyManagementApplication:
                 print(f"Car charging was completed.")
                 # Turn on the battery discharge if the charger is not charging with significant power.
                 self.sonnen_battery_service.set_enable_discharge()
-                self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED)
+                session_id = self.db_service.get_goe_action_session_id()
+                self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
                 return ChargerAction.CHARGING_STOPPED
             elif self.goe_service.is_dynamic_charging_user():
                 print(f"The last authenticated user is the dynamic charging user.")
@@ -127,12 +130,15 @@ class EnergyManagementApplication:
                     # wait x minutes before changing the car charging power to make sure that the energy status is stable and there is actually enough excess energy available for car charging. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
                     self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING)
 
-                    charging_request_time = self.db_service.get_goe_action_timestamp(ChargerAction.REQUEST_DYNAMIC_CHARGING)
+                    charging_request_time = self.db_service.get_goe_action_timestamp()
                     if charging_request_time is not None:
                         time_since_action = (datetime.now() - charging_request_time).total_seconds() / 60
                         if time_since_action >= self.control_structure.START_CAR_CHARGING_WAIT_TIME:
                             if self.goe_service.set_charging_power(available_power):
-                                self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING)
+                                # TODO creae new charging session
+                                session_id = self.create_car_charging_report_entry_start()
+                                
+                                self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id)
                                 return ChargerAction.DYNAMIC_CHARGING
 
                     print(f"Waiting {self.control_structure.START_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before setting the car charging power to {available_power} W to make sure that the energy status is stable.")
@@ -142,12 +148,13 @@ class EnergyManagementApplication:
                     # wait x minutes before switching off the car charging to make sure that the energy status is stable and there is actually not enough excess energy available. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
                     self.db_service.create_goe_action(ChargerAction.REQUEST_STOP_CHARGING)
 
-                    stop_charging_time = self.db_service.get_goe_action_timestamp(ChargerAction.REQUEST_STOP_CHARGING)
+                    stop_charging_time = self.db_service.get_goe_action_timestamp()
                     if stop_charging_time is not None:
                         time_since_action = (datetime.now() - stop_charging_time).total_seconds() / 60
                         if time_since_action >= self.control_structure.STOP_CAR_CHARGING_WAIT_TIME:
                             if self.goe_service.set_charging_power(0):
-                                self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED)
+                                session_id = self.db_service.get_goe_action_session_id()
+                                self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
                                 return ChargerAction.CHARGING_STOPPED
 
                     print(f"Waiting {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before stopping the car charging to make sure that the energy status is stable.")
@@ -177,7 +184,10 @@ class EnergyManagementApplication:
                 if self.goe_service.is_car_charging() or self.goe_service.is_car_charging_allowed():
                     if self.goe_service.set_max_charging_power():
                         print(f"Car charging set to max power.")
-                        self.db_service.create_goe_action(ChargerAction.MAX_CHARGING)
+                        # TODO creae new charging session
+                        session_id = self.create_car_charging_report_entry_start()
+                        
+                        self.db_service.create_goe_action(ChargerAction.MAX_CHARGING, session_id)
                         return ChargerAction.MAX_CHARGING
                 
                 print(f"This code should not be reached: requesting max charging but setting max charging was not successful.")
@@ -190,3 +200,21 @@ class EnergyManagementApplication:
             self.db_service.create_goe_action(ChargerAction.NO_ACTION)
             return ChargerAction.NO_ACTION
     
+    def create_car_charging_report_entry_start(self) -> int:
+        """Create a new entry in the car charging report with the start time and the energy meter value at the start of the charging session.
+        Returns:
+            The session ID of the created car charging report entry.
+        """
+        user, user_name = self.goe_service.get_last_user_with_name()
+        current_meter_value = self.energy_meter.get_total_energy_wh()
+        print(f"Creating car charging report entry with user {user_name} (ID: {user}) and energy meter value {current_meter_value} Wh at the start of the charging session.")
+        return self.db_service.create_car_charging_entry(self.goe_service.CHARGER_SN, self.goe_service.CHARGER_NAME, user, user_name, current_meter_value)
+    
+    def create_car_charging_report_entry_end(self, session_id: int):
+        """Update the car charging report entry with the end time, the energy meter value at the end of the charging session, and the calculated energy consumed during the charging session.
+        Args:
+            session_id: The session ID of the car charging report entry to be updated.
+        """
+        current_meter_value = self.energy_meter.get_total_energy_wh()
+        self.db_service.end_car_charging_entry(session_id, current_meter_value)
+        
