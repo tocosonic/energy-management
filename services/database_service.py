@@ -116,8 +116,11 @@ class DBService:
     def create_car_charging_entry(self, charger_sn: str, charger_name: str, rfid_chip_id: int, rfid_chip_name: str, energy_meter_start: int) -> int:
         """Create a new car charging entry in the database when a charging session starts. Returns the session ID of the created entry."""
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
         start_time = datetime.now()
+        # TODO update to close a non-closed previous entry for the same charger
+
+
+        cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO car_charging_report (charger_sn, charger_name, rfid_chip_id, rfid_chip_name, start_time, energy_meter_start)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -197,12 +200,27 @@ class DBService:
             return None
 
     def get_goe_action_session_id(self) -> int:
-        """Get the session ID associated with a specific GoE action."""
+        """Get the current session ID."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
             SELECT session_id FROM goe_action
         ''', )
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return result[0]
+        else:
+            return None
+
+    def get_goe_action_session_id(self, action: ChargerAction) -> int:
+        """Get the session ID associated with a specific GoE action."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT session_id FROM goe_action WHERE action = ?
+        ''', (action.value,))
         result = cursor.fetchone()
         conn.close()
 

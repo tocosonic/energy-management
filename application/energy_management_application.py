@@ -68,7 +68,7 @@ class EnergyManagementApplication:
                     # Heating 2
                     self.turn_on_heatpump(self.heating_heatpump_service2, self.control_structure.START_HEATING2_WAIT_TIME)
 
-            self.update_car_charging(self.control_structure.START_CAR_CHARGING_WAIT_TIME, self.control_structure.STOP_CAR_CHARGING_WAIT_TIME)
+            self.update_car_charging()
 
             # Check whether or no the heatpumps need to be turned off due to insufficient excess energy. We will only turn off the heat pumps if they are currently on and there is not enough excess energy available for at least the specified stop wait time.
             if self.warm_water_heatpump_service.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_WW_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.warm_water_heatpump_service.energy_consumption:
@@ -102,7 +102,7 @@ class EnergyManagementApplication:
         print(f"Not turning on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)} W, energy consumption of the device: {device.energy_consumption} W")
         return False
         
-    def update_car_charging(self, start_wait_time: int, stop_wait_time: int) -> ChargerAction:
+    def update_car_charging(self) -> ChargerAction:
         """Update on car charging through the GoE API.
         Args:
             start_wait_time: The time in minutes to look back for the minimum grid feed-in value to determine if there is enough excess energy to turn on the car charging.
@@ -184,10 +184,11 @@ class EnergyManagementApplication:
                 if self.goe_service.is_car_charging() or self.goe_service.is_car_charging_allowed():
                     if self.goe_service.set_max_charging_power():
                         print(f"Car charging set to max power.")
-                        # TODO creae new charging session
-                        session_id = self.create_car_charging_report_entry_start()
-                        
-                        self.db_service.create_goe_action(ChargerAction.MAX_CHARGING, session_id)
+                        # creae new charging session, if not already exists...
+                        session_id = self.db_service.get_goe_action_session_id(ChargerAction.MAX_CHARGING)
+                        if session_id is None:
+                            session_id = self.create_car_charging_report_entry_start()
+                            self.db_service.create_goe_action(ChargerAction.MAX_CHARGING, session_id)
                         return ChargerAction.MAX_CHARGING
                 
                 print(f"This code should not be reached: requesting max charging but setting max charging was not successful.")

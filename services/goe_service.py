@@ -257,7 +257,7 @@ class GoEService:
         if current < 6 or current > 16:
             print(f"Invalid charging current: {current}. Only values between 6 and 16 are allowed.")
             return False
-        elif self._get_charging_current() != current:
+        elif self.get_charging_current() != current:
             return self._update_setting("amp", current)
         return False
 
