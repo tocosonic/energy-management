@@ -115,11 +115,8 @@ class EnergyManagementApplication:
         
             if self.goe_service.is_car_charging_complete():
                 print(f"Car charging was completed.")
-                # Turn on the battery discharge if the charger is not charging with significant power.
-                self.sonnen_battery_service.set_enable_discharge()
-                session_id = self.db_service.get_goe_action_session_id()
-                self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
-                return ChargerAction.CHARGING_STOPPED
+                return self.process_charging_finished()
+
             elif self.goe_service.is_dynamic_charging_user():
                 print(f"The last authenticated user is the dynamic charging user.")
                 
@@ -185,7 +182,7 @@ class EnergyManagementApplication:
                     if self.goe_service.set_max_charging_power():
                         print(f"Car charging set to max power.")
                         # creae new charging session, if not already exists...
-                        session_id = self.db_service.get_goe_action_session_id(ChargerAction.MAX_CHARGING)
+                        session_id = self.db_service.get_goe_action_session_id_by_charger_action(ChargerAction.MAX_CHARGING)
                         if session_id is None:
                             session_id = self.create_car_charging_report_entry_start()
                             self.db_service.create_goe_action(ChargerAction.MAX_CHARGING, session_id)
@@ -198,9 +195,28 @@ class EnergyManagementApplication:
         else:
             print(f"Car charging is currently not allowed and the car is not charging.")
             self.sonnen_battery_service.set_enable_discharge()
+            if self.db_service.get_goe_action() == ChargerAction.MAX_CHARGING:
+                return self.process_charging_finished()
+                
+                # session_id = self.db_service.get_goe_action_session_id_by_charger_action(ChargerAction.MAX_CHARGING)
+                # if session_id is not None:
+                #     self.create_car_charging_report_entry_end(session_id)
+                #     # self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
+                #     return ChargerAction.CHARGING_STOPPED
+            
             self.db_service.create_goe_action(ChargerAction.NO_ACTION)
             return ChargerAction.NO_ACTION
     
+    def process_charging_finished(self) -> ChargerAction:
+        """Process the event of car charging being finished. This will be triggered when the GoE API indicates that the car charging was completed. The method will turn on the battery discharge to allow the battery to provide energy for home consumption, and will create a new entry in the car charging report with the end time, the energy meter value at the end of the charging session, and the calculated energy consumed during the charging session."""
+        print(f"Car charging was completed, processing charging finished event.")
+        self.sonnen_battery_service.set_enable_discharge()
+        session_id = self.db_service.get_goe_action_session_id()
+        if session_id is not None:
+            self.create_car_charging_report_entry_end(session_id)
+            self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
+        return ChargerAction.CHARGING_STOPPED
+        
     def create_car_charging_report_entry_start(self) -> int:
         """Create a new entry in the car charging report with the start time and the energy meter value at the start of the charging session.
         Returns:

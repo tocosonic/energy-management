@@ -214,8 +214,8 @@ class DBService:
         else:
             return None
 
-    def get_goe_action_session_id(self, action: ChargerAction) -> int:
-        """Get the session ID associated with a specific GoE action."""
+    def get_goe_action_session_id_by_charger_action(self, action: ChargerAction) -> int:
+        """Get the current session ID associated with a specific GoE action."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -226,6 +226,21 @@ class DBService:
 
         if result:
             return result[0]
+        else:
+            return None
+
+    def get_goe_action(self) -> ChargerAction:
+        """Get the current GoE action."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT action FROM goe_action LIMIT 1
+        ''')
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return ChargerAction(result[0])
         else:
             return None
 
