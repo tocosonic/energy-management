@@ -120,6 +120,7 @@ class EnergyManagementApplication:
             elif self.goe_service.is_dynamic_charging_user():
                 print(f"The last authenticated user is the dynamic charging user.")
                 
+                # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
                 min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
                 available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + self.goe_service.get_current_charging_power()
                 print(f"Minimum grid feed-in: {min_power} W, available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
@@ -130,61 +131,47 @@ class EnergyManagementApplication:
                         self.goe_service.set_charging_power(available_power)
                         return ChargerAction.DYNAMIC_CHARGING
                     else:
-                        # wait x minutes before changing the car charging power to make sure that the energy status is stable and there is actually enough excess energy available for car charging. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
-                        self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING)
-
-                        charging_request_time = self.db_service.get_goe_action_timestamp_by_charger_id(ChargerAction.REQUEST_DYNAMIC_CHARGING)
-                        if charging_request_time is None:
-                            # create the charging request entry
-                            self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING)
-                            print(f"Requested to start dynamic charging, waiting {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes before setting the car charging power to {available_power} W to make sure that the energy status is stable.")
-                            return ChargerAction.REQUEST_DYNAMIC_CHARGING
+                        if self.goe_service.set_charging_power(available_power):
+                            print(">>> Car charging power set to", available_power, "W")
+                            # create new charging session
+                            session_id = self.create_car_charging_report_entry_start()
+                            self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id)
+                            return ChargerAction.DYNAMIC_CHARGING
                         else:
-                            print(f">>> Time now = {datetime.now()}, ChargingRequestTime = {charging_request_time}")
-                            
-                            delta = datetime.now() - charging_request_time
-                            print(f"Time since requesting to start dynamic charging: {delta.total_seconds() / 60:.2f} minutes")
-                            
-                            time_since_action = int(delta.total_seconds() / 60)
-                            if time_since_action >= self.control_structure.START_CAR_CHARGING_WAIT_TIME:
-                                if self.goe_service.set_charging_power(available_power):
-                                    print(">>> Car charging power set to", available_power, "W")
-                                    # TODO create new charging session
-                                    session_id = self.create_car_charging_report_entry_start()
-                                    
-                                    self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id)
-                                    return ChargerAction.DYNAMIC_CHARGING
-
-                        print(f"Waiting {self.control_structure.START_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before setting the car charging power to {available_power} W to make sure that the energy status is stable.")
-                        return ChargerAction.REQUEST_DYNAMIC_CHARGING
+                            print(f"!!! Failed to set car charging power to {available_power} W, will retry in {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes.")
+                            self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING)
+                            return ChargerAction.REQUEST_DYNAMIC_CHARGING
                 else:
                     print(f"Not enough excess energy available to turn on car charging. Available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
                     # wait x minutes before switching off the car charging to make sure that the energy status is stable and there is actually not enough excess energy available. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
-                    session_id = self.db_service.get_goe_action_session_id()
-                    print(f">>> Session ID for charging session: {session_id}")
-                    self.db_service.create_goe_action(ChargerAction.REQUEST_STOP_CHARGING, session_id)
+                    
+                    current_goe_action = self.db_service.get_goe_action()
+                    if current_goe_action in [ChargerAction.DYNAMIC_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.REQUEST_STOP_CHARGING]:
+                        print(f"Car charging is currently active, checking if we need to request to stop the car charging due to insufficient excess energy.")
+                        session_id = self.db_service.get_goe_action_session_id()
+                        print(f">>> Session ID for charging session: {session_id}")
+                        if current_goe_action != ChargerAction.REQUEST_STOP_CHARGING:
+                            self.db_service.create_goe_action(ChargerAction.REQUEST_STOP_CHARGING, session_id)
 
-                    stop_charging_time = self.db_service.get_goe_action_timestamp_by_charger_id(ChargerAction.REQUEST_STOP_CHARGING)
-                    if stop_charging_time is not None:
-                        delta = datetime.now() - stop_charging_time
-                        print(f"Time since requesting to stop dynamic charging: {delta.total_seconds() / 60:.2f} minutes")
-                        
-                        time_since_action = int(delta.total_seconds() / 60)
-                        if time_since_action >= self.control_structure.STOP_CAR_CHARGING_WAIT_TIME:
-                            print(">>>> Now it's time to stop charging")
-                            if self.goe_service.set_charging_power(0):
-                                print(">>> Car charging stopped")
-                                # session_id = self.db_service.get_goe_action_session_id()
-                                # print(f">>> Session ID for charging session: {session_id}")
-                                return self.process_charging_finished()
-                                
-                                # self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
-                                # return ChargerAction.CHARGING_STOPPED
-                            else:
-                                print(f"Failed to stop car charging, will retry in {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME} minutes.")
+                        stop_charging_time = self.db_service.get_goe_action_timestamp_by_charger_id(ChargerAction.REQUEST_STOP_CHARGING)
+                        if stop_charging_time is not None:
+                            delta = datetime.now() - stop_charging_time
+                            print(f"Time since requesting to stop dynamic charging: {delta.total_seconds() / 60:.2f} minutes")
+                            
+                            time_since_action = int(delta.total_seconds() / 60)
+                            if time_since_action >= self.control_structure.STOP_CAR_CHARGING_WAIT_TIME:
+                                print(">>>> Now it's time to stop charging")
+                                if self.goe_service.set_charging_power(0):
+                                    print(">>> Car charging stopped")
+                                    return self.process_charging_finished()
+                                else:
+                                    print(f"Failed to stop car charging, will retry in {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME} minutes.")
 
-                    print(f"Waiting {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before stopping the car charging to make sure that the energy status is stable.")
-                    return ChargerAction.REQUEST_STOP_CHARGING
+                        print(f"Waiting {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before stopping the car charging to make sure that the energy status is stable.")
+                        return ChargerAction.REQUEST_STOP_CHARGING
+                    else:
+                        print(f"Car charging is currently not active, no need to request to stop the car charging due to insufficient excess energy.")
+                        return ChargerAction.NO_ACTION
                 
                 # If the last authenticated user is the dynamic charging user, we will control the car charging based on the current energy status and the control structure.
                 # if self.goe_service.is_car_charging_allowed():

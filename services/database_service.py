@@ -49,7 +49,7 @@ class DBService:
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS energy_status (
-                timestamp DATETIME PRIMARY KEY NOT NULL,
+                timestamp DATETIME NOT NULL,
                 production INTEGER NOT NULL,
                 consumption INTEGER NOT NULL,
                 feed_in INTEGER NOT NULL
@@ -117,6 +117,7 @@ class DBService:
         """Create a new car charging entry in the database when a charging session starts. Returns the session ID of the created entry."""
         conn = sqlite3.connect(self.db_path)
         start_time = datetime.now()
+        print(f"+++ Creating car charging entry in database with charger_sn {charger_sn}, charger_name {charger_name}, rfid_chip_id {rfid_chip_id}, rfid_chip_name {rfid_chip_name}, start_time {start_time}, energy_meter_start {energy_meter_start} Wh")
         # TODO update to close a non-closed previous entry for the same charger
 
 
@@ -135,6 +136,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         end_time = datetime.now()
+        print(f"+++ Ending car charging entry in database for session ID {session_id} with end_time {end_time} and energy_meter_end {energy_meter_end} Wh")
         cursor.execute('''
             SELECT start_time, energy_meter_start FROM car_charging_report WHERE id = ?
         ''', (session_id,))
@@ -177,6 +179,7 @@ class DBService:
         ''')
 
         timestamp = datetime.now()
+        print(f"+++ Creating GoE action entry in database with action {action}, timestamp {timestamp}, session_id {session_id}")
         cursor.execute('''
             INSERT INTO goe_action (action, timestamp, session_id)
             VALUES (?, ?, ?)
@@ -302,6 +305,7 @@ class DBService:
         ''')
 
         timestamp = datetime.now()
+        print(f"+++ Creating heat pump action entry in database for table {table_name} with action {action} and timestamp {timestamp}")
         cursor.execute(f'''
             INSERT INTO {table_name} (action, timestamp)
             VALUES (?, ?)
@@ -320,7 +324,7 @@ class DBService:
         conn.close()
 
         if result:
-            return result[0]
+            return datetime.fromisoformat(result[0])
         else:
             return None
 
@@ -328,6 +332,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         timestamp = datetime.now()
+        print(f"+++ Creating relay status entry in database for device {device_name} with id {id}, is_on {is_on}, and timestamp {timestamp}")
         cursor.execute('''
             INSERT OR IGNORE INTO relay_status (id, device_name, timestamp, is_on)
             VALUES (?, ?, ?, ?)
@@ -339,6 +344,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         timestamp = datetime.now()
+        print(f"+++ Updating relay status entry in database for device with id {id} to is_on {is_on} with timestamp {timestamp}")
         cursor.execute('''
             UPDATE relay_status
             SET timestamp = ?, is_on = ?
@@ -368,6 +374,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         timestamp = datetime.now()
+        print(f"+++ Creating energy status entry in database with timestamp {timestamp}, production {production} W, consumption {consumption} W, feed_in {feed_in} W")
         cursor.execute('''
             INSERT INTO energy_status (timestamp, production, consumption, feed_in)
             VALUES (?, ?, ?, ?)
@@ -382,6 +389,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cutoff_time = datetime.now() - timedelta(minutes=minutes)
+        print(f"+++ Fetching energy status entries from database since cutoff time {cutoff_time}")
         cursor.execute('''
             SELECT timestamp, production, consumption, feed_in
             FROM energy_status
@@ -406,6 +414,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cutoff_time = datetime.now() - timedelta(minutes=minutes)
+        print(f"+++ Cleaning up old energy status entries from database before cutoff time {cutoff_time}")
         cursor.execute('''
             DELETE FROM energy_status WHERE timestamp < ?
         ''', (cutoff_time,))
