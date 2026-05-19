@@ -1,5 +1,5 @@
 import requests
-import time
+from time import time
 
 class WeatherService:
     def __init__(self, api_key, latitude, longitude):

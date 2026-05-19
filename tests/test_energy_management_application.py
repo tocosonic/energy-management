@@ -4,9 +4,16 @@ from pathlib import Path
 import os
 import sys
 import tempfile
+from dotenv import load_dotenv
 
 import pytest
 from unittest.mock import Mock, patch
+from freezegun import freeze_time
+
+@pytest.fixture(autouse=True)
+def frozen_time():
+    with freeze_time(datetime.now()) as frozen:
+        yield frozen
 
 # Allow imports like `from services...` and `from application...`.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -21,11 +28,9 @@ from services.database_service import ChargerAction
 def app_with_mocked_io():
     """Create app instance with all I/O mocked."""
 
-    print("")
-    print(">>> create database file for testing and ensure it's removed after the test")
     # create database file for testing and ensure it's removed after the test
-    fd, db_path = tempfile.mkstemp(suffix="_ema_long_process.db")
-    os.close(fd)
+    # fd, db_path = tempfile.mkstemp(suffix="_ema_long_process.db")
+    # os.close(fd)
 
     env_vars = {
         "RELAY_PIN_WW": "20",
@@ -41,6 +46,7 @@ def app_with_mocked_io():
         "GOE_API_KEY": "test_goe_key",
         "GOE_FIXED_CHARGING_USER": "1",
         "GOE_DYNAMIC_CHARGING_USER": "0",
+        # "DATABASE_PATH": db_path, --- IGNORE ---
         "DATABASE_PATH": "./test-db.db",
         "WW_ENERGY_CONSUMPTION": "700",
         "HEATING1_ENERGY_CONSUMPTION": "1000",
@@ -123,6 +129,12 @@ def app_with_mocked_io():
         app = EnergyManagementApplication()
         app.energy_meter.client = mock_energy_meter_client
 
+        app.goe_service.set_charging_off = Mock(return_value=True)
+        app.goe_service._set_charging_phases = Mock(return_value=True)
+        app.goe_service._set_charging_current= Mock(return_value=True)
+        app.goe_service._update_setting = Mock(return_value=True)
+        app.goe_service._get_sleep_time = Mock(return_value=0)  # override sleep time to speed up tests
+
         yield app
 
     # Ensure the temporary database file is removed after the test.
@@ -137,22 +149,19 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         app = app_with_mocked_io
         energy_meter_start = 25000  # Start with 25 kWh total energy
         app.energy_meter.get_total_energy_wh = Mock(return_value=energy_meter_start)
+        # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
+        app.goe_service.is_car_charging_allowed = Mock(return_value=True)
+        app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
+        app.goe_service.get_last_user = Mock(return_value=(1))
 
         # Simulate a long-running process with varying available power.
         # 10 + 8 + 12 + 5 + 30 = 65 minutes total, which meets the requirement of > 60 minutes.
-        available_power_profile = [5000] * 20 + [0] * 8 + [1400] * 12 + [0] * 5 + [7000] * 30
-
+        available_power_profile = [5000] * 10 + [0] * 8 + [1400] * 12 + [0] * 5 + [7000] * 10
         history: list[dict[str, int | bool]] = []
 
         for minute, available_power in enumerate(available_power_profile):
             # Mock the method that retrieves the minimum grid feed-in value to return the current available power in the profile.
             app.sonnen_battery_service.get_grid_feed_in_minimum = Mock(return_value=available_power)
-
-            # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
-            app.goe_service.is_car_charging_allowed = Mock(return_value=True)
-            app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
-            
-            #.get_last_user = Mock(return_value="1")  # Return the fixed charging user as the last user to ensure that the car is allowed to charge when there is enough excess energy
 
             action = app.update_car_charging()
             history.append(
@@ -186,22 +195,19 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         app = app_with_mocked_io
         energy_meter_start = 61500  # Start with 61.5 kWh total energy
         app.energy_meter.get_total_energy_wh = Mock(return_value=energy_meter_start)
+        # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
+        app.goe_service.is_car_charging_allowed = Mock(return_value=True)
+        app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
+        app.goe_service.get_last_user = Mock(return_value=(1))
 
         # Simulate a long-running process with varying available power.
         # 10 + 8 + 12 + 5 + 30 = 65 minutes total, which meets the requirement of > 60 minutes.
         available_power_profile = [5000] * 20 + [0] * 8 + [1400] * 12 + [0] * 5 + [7000] * 30
-
         history: list[dict[str, int | bool]] = []
 
         for minute, available_power in enumerate(available_power_profile):
             # Mock the method that retrieves the minimum grid feed-in value to return the current available power in the profile.
             app.sonnen_battery_service.get_grid_feed_in_minimum = Mock(return_value=available_power)
-
-            # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
-            app.goe_service.is_car_charging_allowed = Mock(return_value=True)
-            app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
-            
-            #.get_last_user = Mock(return_value="1")  # Return the fixed charging user as the last user to ensure that the car is allowed to charge when there is enough excess energy
 
             action = app.update_car_charging()
             history.append(
@@ -229,9 +235,62 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         for record in history:
             print(record)
         
-    def test_long_running_profile_switches_phase_current_and_off(self, app_with_mocked_io: EnergyManagementApplication):
+    def test_long_running_profile_dynamic_power(self, app_with_mocked_io: EnergyManagementApplication, frozen_time):
         print(">>> start long-running simulation of car charging process with variable power")
+        load_dotenv()
         
         app = app_with_mocked_io
+        energy_meter_start = 100000  # Start with 92.5 kWh total energy
+        app.energy_meter.get_total_energy_wh = Mock(return_value=energy_meter_start)
+        # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
+        app.goe_service.is_car_charging_allowed = Mock(return_value=True)
+        app.goe_service.get_last_user_with_name = Mock(return_value=(0, "Dynamic Charging User"))
+        app.goe_service.get_last_user = Mock(return_value=(0))
+
+        # available_power_profile = [5000] * 10
+        available_power_profile = [5000] * 10 + [0] * 8 + [1400] * 12 + [0] * 5 + [7000] * 10
+        history: list[dict[str, int | bool]] = []
+
+        frozen_time_start = datetime(2026, 5, 19, 12, 0, 0)  # Start at a fixed time for consistent testing
+        frozen_time.move_to(frozen_time_start)
         
+        # with freeze_time(datetime.now()) as frozen_time:
+        for minute, available_power in enumerate(available_power_profile):
+            # Mock the method that retrieves the minimum grid feed-in value to return the current available power in the profile.
+            app.sonnen_battery_service.get_grid_feed_in_minimum = Mock(return_value=available_power)
+
+            # datetime.now needs to be mocked to simulate the waiting times for starting and stopping the car charging process. The waiting times are defined in the environment variables START_CAR_CHARGING_WAIT_TIME and STOP_CAR_CHARGING_WAIT_TIME, which are set to 7 and 15 minutes respectively in the test environment variables. So we need to simulate a time progression of at least 22 minutes to test both the starting and stopping process of the car charging.
+            frozen_time.move_to(frozen_time_start + timedelta(minutes=minute))
+
+            action = app.update_car_charging()
+            history.append(
+                {
+                    "minute": minute,
+                    "available_power": available_power,
+                    "charger_action": action,
+                }
+            )
+            
+            # check if the charging wait time 
+            if minute == int(os.getenv("START_CAR_CHARGING_WAIT_TIME")) - 1:
+                assert action == ChargerAction.REQUEST_DYNAMIC_CHARGING, f"Expected to still be requesting to charge at minute {minute}, but got {action}"
+            elif minute == int(os.getenv("START_CAR_CHARGING_WAIT_TIME")):
+                assert action == ChargerAction.DYNAMIC_CHARGING, f"Expected to be in dynamic charging phase at minute {minute}, but got {action}"
+
+        # set car charging off at the end of the profile to test the stopping process as well
+        total_energy = 40000
+        app.energy_meter.get_total_energy_wh = Mock(return_value=total_energy + energy_meter_start)  # Mock total energy
+        app.goe_service.is_car_charging_complete = Mock(return_value=True)
+        action = app.update_car_charging()
+        history.append(
+            {
+                "minute": len(available_power_profile),
+                "available_power": available_power_profile[len(available_power_profile) - 1],
+                "charger_action": action,
+            }
+        )
+
+        print("History of car charging actions:")
+        for record in history:
+            print(record)
         

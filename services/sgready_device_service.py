@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime
 import RPi.GPIO as GPIO
 
 from services.database_service import DBService

@@ -195,7 +195,22 @@ class DBService:
         conn.close()
 
         if result:
-            return result[0]
+            return datetime.fromisoformat(result[0])
+        else:
+            return None
+
+    def get_goe_action_timestamp_by_charger_id(self, action: ChargerAction) -> datetime:
+        """Get the timestamp of when a specific GoE action was last set for a given charger ID."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT timestamp FROM goe_action WHERE action = ?
+        ''', (action.value,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return datetime.fromisoformat(result[0])
         else:
             return None
 
@@ -243,6 +258,11 @@ class DBService:
             return ChargerAction(result[0])
         else:
             return None
+
+    def is_goe_action(self, action: ChargerAction) -> bool:
+        """Check if a specific GoE action is currently active."""
+        current_action = self.get_goe_action()
+        return current_action == action
 
     def create_ww_heat_pump_action(self, action: HeatPumpAction):
         self._create_heat_pump_action("ww_heat_pump_action", action)
@@ -339,7 +359,10 @@ class DBService:
         conn.close()
 
         # Values are stored using datetime.now(), so return them directly.
-        return result[0]
+        if result:
+            return datetime.fromisoformat(result[0])
+        else:
+            return None
 
     def create_energy_status(self, production: int, consumption: int, feed_in: int):
         conn = sqlite3.connect(self.db_path)

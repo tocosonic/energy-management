@@ -194,16 +194,23 @@ class GoEService:
             print(f"Error updating setting '{key}': {e}")
             return False
 
+    def _get_sleep_time(self) -> int:
+        return 15
+
     def set_charging_off(self) -> bool:
         """Force charging off."""
-        ret = self._update_setting("frc", 1)
-        time.sleep(15)  # wait for the charger to stop charging before returning to avoid issues with subsequent updates
+        ret = False
+        if self.is_car_charging():
+            ret = self._update_setting("frc", 1)
+            time.sleep(self._get_sleep_time())  # wait for the charger to stop charging before returning to avoid issues with subsequent updates
         return ret
 
     def set_charging_on(self) -> bool:
         """Force charging on."""
-        ret = self._update_setting("frc", 2)
-        time.sleep(15)  # wait for the charger to start charging before returning to avoid issues with subsequent updates
+        ret = False
+        if not self.is_car_charging():
+            ret = self._update_setting("frc", 2)
+            time.sleep(self._get_sleep_time())  # wait for the charger to start charging before returning to avoid issues with subsequent updates
         return ret
 
     def set_charging_default(self) -> bool:
@@ -217,6 +224,8 @@ class GoEService:
         Returns:
             True if the update succeeded, otherwise False.
         """
+        print(">>> Setting charging phases to", phases)
+        
         current_phases = self._get_phases()
         is_car_charging = self.is_car_charging()
         charging_stopped = False
@@ -254,6 +263,8 @@ class GoEService:
         Returns:
             True if the update was applied and succeeded, otherwise False.
         """
+        print(">>> Setting charging current to", current)
+        
         if current < 6 or current > 16:
             print(f"Invalid charging current: {current}. Only values between 6 and 16 are allowed.")
             return False
@@ -280,17 +291,21 @@ class GoEService:
         total_current_required = power / 230  # convert energy in watts to current in amperes assuming 230 V
         if total_current_required < 6:
             print(f"Requested power {power} W is too low. Minimum is {self.MINIMUM_ENERGY_CONSUMPTION} W (6 A). Turning charging off and setting minimum values.")
-            self.set_charging_off()
+            ret = self.set_charging_off()
             self.set_charging_power(self.MINIMUM_ENERGY_CONSUMPTION)
-            return False
+            return ret
         else:
             # if the required total current is between 6 and 18 A (18 A is the minimum total current for three phases: 3x 6 A), use single phase charging with the required current
             phases_required = 1 if total_current_required < 18 else 3
             current_required = math.floor(min(total_current_required / phases_required, 16))  # the charger supports a maximum of 16 A per phase
             
+            # TODO set phases and current at the same time to avoid intermediate states with wrong power, but this requires further testing to make sure that the charger accepts multiple simultaneous setting changes and applies them correctly. For now we set the phases first and then the current with a short delay in between to make sure that the charger has applied the new number of phases before we update the current to avoid issues with unsupported current-phase combinations.
+            
             ret = self._set_charging_phases(phases_required)
+            print(f">>> Set charging phases to {phases_required} for requested power {power} W, return value: {ret}")
             if ret:
                 ret = self._set_charging_current(current_required)
+                print(f">>> Set charging current to {current_required} A for requested power {power} W, return value: {ret}")
                 if(ret):
                     self.set_charging_on()  # make sure charging is on after successfully updating the settings
                 return ret
