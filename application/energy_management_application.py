@@ -187,14 +187,6 @@ class EnergyManagementApplication:
                         print(f"Car charging is currently not active, no need to request to stop the car charging due to insufficient excess energy.")
                         return ChargerAction.NO_ACTION
                 
-                # If the last authenticated user is the dynamic charging user, we will control the car charging based on the current energy status and the control structure.
-                # if self.goe_service.is_car_charging_allowed():
-                #     # return self.turn_on_heatpump(self.goe_service, start_wait_time)
-                # else:
-                #     # Check if we need to turn off the car charging due to insufficient excess energy. We will only turn off the car charging if it is currently on and there is not enough excess energy available for at least the specified stop wait time.
-                #     if self.goe_service.is_car_charging() and self.sonnen_battery_service.get_grid_feed_in_minimum(stop_wait_time) + self.control_structure.NON_USED_ENERGY_BUFFER < self.goe_service.energy_consumption:
-                #         self.goe_service.turn_off()
-                #         return True
             else:
                 print(f"The last authenticated user is the fixed charging user.")
                 # If the last authenticated user is the fixed charging user, we will turn on the car charging with max. power and disable discharging of the battery.

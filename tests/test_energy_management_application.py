@@ -10,7 +10,7 @@ import pytest
 from unittest.mock import Mock, patch
 from freezegun import freeze_time
 
-TEST_START_TIME = datetime(2026, 5, 19, 12, 0, 0)
+TEST_START_TIME = datetime(2026, 5, 20, 12, 0, 0)
 
 @pytest.fixture(autouse=True)
 def frozen_time():
@@ -129,6 +129,7 @@ def app_with_mocked_io():
 
         print(">>> initialize app with mocked I/O")
         app = EnergyManagementApplication()
+        app.db_service._clear_tables()  # Clear the database to ensure a clean state for testing
         app.energy_meter.client = mock_energy_meter_client
 
         app.goe_service.set_charging_off = Mock(return_value=True)
@@ -158,6 +159,17 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
     
     PS: pytest option "-s" is needed to see the print statements in the test output, which are helpful to understand the sequence of actions and the state of the application during the test run.
     """
+
+    def _set_sonnen_battery_power(self, app: EnergyManagementApplication, production: int, grid_feed_in: int, consumption: int):
+        app.sonnen_battery_service.get_energy_production = Mock(return_value=production)  # Mock energy production to 5000 W to simulate a situation where there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
+        app.sonnen_battery_service.get_grid_feed = Mock(return_value=grid_feed_in)  # Mock maximum available power to 7000 W to simulate a situation where there is enough excess energy available for charging with max power.
+        app.sonnen_battery_service.get_energy_consumption = Mock(return_value=consumption)  # Mock energy consumption to 2000 W to simulate a situation where there is excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
+        app.sonnen_battery_service.refresh_status()  # Refresh the Sonnen battery status to update the grid feed-in value based on the mocked available power
+    
+    def _set_goe_service(self, app: EnergyManagementApplication, charging_allowed: bool, last_user_id: int, last_user_name: str, authenticated_user_id: int):
+        app.goe_service.is_car_charging_allowed = Mock(return_value=charging_allowed)
+        app.goe_service.get_last_user_with_name = Mock(return_value=(last_user_id, last_user_name))
+        app.goe_service.get_authenticated_user = Mock(return_value=(authenticated_user_id))
     
     def test_long_running_profile_max_power_stop_with_charging_not_allowed(self, app_with_mocked_io: EnergyManagementApplication, frozen_time):
         print(">>> start long-running simulation of car charging process with max power")
@@ -166,9 +178,7 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         energy_meter_start = 25000  # Start with 25 kWh total energy
         app.energy_meter.get_total_energy_wh = Mock(return_value=energy_meter_start)
         # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
-        app.goe_service.is_car_charging_allowed = Mock(return_value=True)
-        app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
-        app.goe_service.get_authenticated_user = Mock(return_value=(1))
+        self._set_goe_service(app, charging_allowed=True, last_user_id=1, last_user_name="Fixed Charging User", authenticated_user_id=1)
 
         # Simulate a long-running process with varying available power.
         # 10 + 8 + 12 + 5 + 10 = 45 minutes total
@@ -185,14 +195,11 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
             grid_feed_in = available_power
             consumption = 1500
             production = consumption + grid_feed_in  # Ensure that there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-            app.sonnen_battery_service.get_energy_production = Mock(return_value=production)  # Mock energy production to 5000 W to simulate a situation where there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-            app.sonnen_battery_service.get_grid_feed = Mock(return_value=grid_feed_in)  # Mock maximum available power to 7000 W to simulate a situation where there is enough excess energy available for charging with max power.
-            app.sonnen_battery_service.get_energy_consumption = Mock(return_value=consumption)  # Mock energy consumption to 2000 W to simulate a situation where there is excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
+            self._set_sonnen_battery_power(app, production, grid_feed_in, consumption)
 
             # total energy consumed so far
             total_energy = sum(available_power_profile[:minute + 1])  # Total energy is the sum of available power up to the current minute
             app.energy_meter.get_total_energy_wh = Mock(return_value=total_energy + energy_meter_start)  # Mock total energy
-            app.sonnen_battery_service.refresh_status()  # Refresh the Sonnen battery status to update the grid feed-in value based on the mocked available power
 
             action = app.update_car_charging()
             history.append(
@@ -225,9 +232,7 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         energy_meter_start = 61500  # Start with 61.5 kWh total energy
         app.energy_meter.get_total_energy_wh = Mock(return_value=energy_meter_start)
         # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
-        app.goe_service.is_car_charging_allowed = Mock(return_value=True)
-        app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
-        app.goe_service.get_authenticated_user = Mock(return_value=(1))
+        self._set_goe_service(app, charging_allowed=True, last_user_id=1, last_user_name="Fixed Charging User", authenticated_user_id=1)
 
         # Simulate a long-running process with varying available power.
         # 10 + 8 + 12 + 5 + 30 = 65 minutes total
@@ -244,14 +249,11 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
             grid_feed_in = available_power
             consumption = 1500
             production = consumption + grid_feed_in  # Ensure that there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-            app.sonnen_battery_service.get_energy_production = Mock(return_value=production)  # Mock energy production to 5000 W to simulate a situation where there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-            app.sonnen_battery_service.get_grid_feed = Mock(return_value=grid_feed_in)  # Mock maximum available power to 7000 W to simulate a situation where there is enough excess energy available for charging with max power.
-            app.sonnen_battery_service.get_energy_consumption = Mock(return_value=consumption)  # Mock energy consumption to 2000 W to simulate a situation where there is excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-
+            self._set_sonnen_battery_power(app, production, grid_feed_in, consumption)
+            
             # total energy consumed so far
             total_energy = sum(available_power_profile[:minute + 1])  # Total energy is the sum of available power up to the current minute
             app.energy_meter.get_total_energy_wh = Mock(return_value=total_energy + energy_meter_start)  # Mock total energy
-            app.sonnen_battery_service.refresh_status()  # Refresh the Sonnen battery status to update the grid feed-in value based on the mocked available power
 
             action = app.update_car_charging()
             history.append(
@@ -282,12 +284,10 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         load_dotenv()
         
         app = app_with_mocked_io
-        energy_meter_start = 100000  # Start with 92.5 kWh total energy
+        energy_meter_start = 200000  # Start with 200 kWh total energy
         app.energy_meter.get_total_energy_wh = Mock(return_value=energy_meter_start)
         # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
-        app.goe_service.is_car_charging_allowed = Mock(return_value=True)
-        app.goe_service.get_last_user_with_name = Mock(return_value=(0, "Dynamic Charging User"))
-        app.goe_service.get_authenticated_user = Mock(return_value=(0))
+        self._set_goe_service(app, charging_allowed=True, last_user_id=0, last_user_name="Dynamic Charging User", authenticated_user_id=0)
 
         # available_power_profile = [5000] * 10
         available_power_profile = [0] * 7 + [5000] * 10 + [0] * 8 + [1400] * 12 + [0] * 5 + [7000] * 10
@@ -303,14 +303,11 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
             grid_feed_in = available_power
             consumption = 1500
             production = consumption + grid_feed_in  # Ensure that there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-            app.sonnen_battery_service.get_energy_production = Mock(return_value=production)  # Mock energy production to 5000 W to simulate a situation where there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-            app.sonnen_battery_service.get_grid_feed = Mock(return_value=grid_feed_in)  # Mock maximum available power to 7000 W to simulate a situation where there is enough excess energy available for charging with max power.
-            app.sonnen_battery_service.get_energy_consumption = Mock(return_value=consumption)  # Mock energy consumption to 2000 W to simulate a situation where there is excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
-
+            self._set_sonnen_battery_power(app, production, grid_feed_in, consumption)
+            
             # total energy consumed so far
             total_energy = sum(available_power_profile[:minute + 1])  # Total energy is the sum of available power up to the current minute
             app.energy_meter.get_total_energy_wh = Mock(return_value=total_energy + energy_meter_start)  # Mock total energy
-            app.sonnen_battery_service.refresh_status()  # Refresh the Sonnen battery status to update the grid feed-in value based on the mocked available power
 
             action = app.update_car_charging()
             history.append(
@@ -341,4 +338,66 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         print("History of car charging actions:")
         for record in history:
             print(record)
+
+
+
+
+    def test_long_running_profile_fixed_and_dynamic_power(self, app_with_mocked_io: EnergyManagementApplication, frozen_time):
+        print(">>> start long-running simulation of car charging process with fixed and dynamic power")
+        load_dotenv()
         
+        app = app_with_mocked_io
+        energy_meter_start = 400000  # Start with 400 kWh total energy
+        app.energy_meter.get_total_energy_wh = Mock(return_value=energy_meter_start)
+        # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
+        self._set_goe_service(app, charging_allowed=True, last_user_id=0, last_user_name="Dynamic Charging User", authenticated_user_id=0)
+
+        # available_power_profile = [5000] * 10
+        available_power_profile = [[0, 0, "Dynamic Charging User"]] * 7 + [[5000, 0, "Dynamic Charging User"]] * 10 + [[0, 0, "Dynamic Charging User"]] * 8 + [[1400, 0, "Dynamic Charging User"]] * 12 + [[0, 0, "Dynamic Charging User"]] * 5 + [[7000, 0, "Dynamic Charging User"]] * 10 + [[1000, 1, "Fixed Charging User"]] * 10 + [[0, 0, "Dynamic Charging User"]] * 7 + [[4000, 0, "Dynamic Charging User"]] * 10 + [[1500, 0, "Dynamic Charging User"]]
+        history: list[dict[str, int | bool]] = []
+
+        frozen_time_start = TEST_START_TIME + timedelta(minutes=180)  # Start at a fixed time for consistent testing
+        frozen_time.move_to(frozen_time_start)
+        
+        for minute, (available_power, user_id, user_name) in enumerate(available_power_profile):
+            # datetime.now needs to be mocked to simulate the waiting times for starting and stopping the car charging process. The waiting times are defined in the environment variables START_CAR_CHARGING_WAIT_TIME and STOP_CAR_CHARGING_WAIT_TIME, which are set to 7 and 15 minutes respectively in the test environment variables. So we need to simulate a time progression of at least 22 minutes to test both the starting and stopping process of the car charging.
+            frozen_time.move_to(frozen_time_start + timedelta(minutes=minute))
+
+            grid_feed_in = available_power
+            consumption = 1500
+            production = consumption + grid_feed_in  # Ensure that there is some excess energy available for charging, but not the full 7000 W as in the previous test with max power. This allows us to test the dynamic adjustment of the charging power based on the available excess energy.
+            self._set_sonnen_battery_power(app, production, grid_feed_in, consumption)
+            self._set_goe_service(app, charging_allowed=True, last_user_id=user_id, last_user_name=user_name, authenticated_user_id=user_id)
+
+            # total energy consumed so far
+            total_energy = sum([power for power, _, _ in available_power_profile[:minute + 1]])  # Total energy is the sum of available power up to the current minute
+            app.energy_meter.get_total_energy_wh = Mock(return_value=total_energy + energy_meter_start)  # Mock total energy
+
+            action = app.update_car_charging()
+            history.append(
+                {
+                    "minute": minute,
+                    "available_power": available_power,
+                    "charger_action": action,
+                    "user_id": user_id,
+                    "user_name": user_name,
+                }
+            )
+            
+        # set car charging off at the end of the profile to test the stopping process as well
+        app.goe_service.is_car_charging_complete = Mock(return_value=True)
+        action = app.update_car_charging()
+        history.append(
+            {
+                "minute": len(available_power_profile),
+                "available_power": available_power_profile[len(available_power_profile) - 1][0],
+                "charger_action": action,
+                "user_id": available_power_profile[len(available_power_profile) - 1][1],
+                "user_name": available_power_profile[len(available_power_profile) - 1][2],
+            }
+        )
+
+        print("History of car charging actions:")
+        for record in history:
+            print(record)
+                

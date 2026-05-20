@@ -114,6 +114,19 @@ class DBService:
         conn.commit()
         conn.close()
 
+    def _clear_tables(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM relay_status')
+        cursor.execute('DELETE FROM energy_status')
+        cursor.execute('DELETE FROM goe_action')
+        cursor.execute('DELETE FROM ww_heat_pump_action')
+        cursor.execute('DELETE FROM heating1_heat_pump_action')
+        cursor.execute('DELETE FROM heating2_heat_pump_action')
+        cursor.execute('DELETE FROM car_charging_report')
+        conn.commit()
+        conn.close()
+
     def create_car_charging_entry(self, charger_sn: str, charger_name: str, rfid_chip_id: int, rfid_chip_name: str, energy_meter_start: int) -> int:
         """Create a new car charging entry in the database when a charging session starts. Returns the session ID of the created entry."""
         conn = sqlite3.connect(self.db_path)
