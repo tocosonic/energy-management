@@ -5,7 +5,7 @@ from time import sleep
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from services.database_service import DBService
-from services.database_service import ChargerAction
+from services.database_service import ChargerAction, HeatpumpAction
 from services.goe_service import GoEService
 from services.sonnen_battery_service import SonnenBatteryService
 from services.weather_service import WeatherService
@@ -60,7 +60,8 @@ class EnergyManagementApplication:
             # Refresh the status of the Sonnen battery
             self.sonnen_battery_service.refresh_status()
 
-            # Turn on devices if there is enough excess energy available, starting with the most important device (warm water heat pump) and then the heating heat pumps. The car charging will be turned on if there is enough excess energy available after turning on the heat pumps.
+            # Turn on devices if there is enough excess energy available, starting with the most important device (warm water heat pump) and then the heating heat pumps.
+            # Only turn on one device at a time.
             # WW heatpump
             if not self.turn_on_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME):
                 # Heating 1
@@ -70,7 +71,7 @@ class EnergyManagementApplication:
 
             self.update_car_charging()
 
-            # Check whether or no the heatpumps need to be turned off due to insufficient excess energy. We will only turn off the heat pumps if they are currently on and there is not enough excess energy available for at least the specified stop wait time.
+            # Check whether or not the heatpumps need to be turned off due to insufficient excess energy. We will only turn off the heat pumps if they are currently on and there is not enough excess energy available for at least the specified stop wait time.
             if self.warm_water_heatpump_service.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_WW_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.warm_water_heatpump_service.energy_consumption:
                 print(f"Turning off {self.warm_water_heatpump_service.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {self.control_structure.STOP_WW_WAIT_TIME} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_WW_WAIT_TIME)} W, energy consumption of the device: {self.warm_water_heatpump_service.energy_consumption} W")
                 self.warm_water_heatpump_service.turn_off()
@@ -92,14 +93,19 @@ class EnergyManagementApplication:
         Returns:
             True if the device was turned on, False otherwise.
         """
-        if not device.is_on:
+        if not device.is_on():
             min = self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)
             if min - self.control_structure.NON_USED_ENERGY_BUFFER >= device.energy_consumption:
                 print(f"Turning on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {min} W, energy consumption of the device: {device.energy_consumption} W")
                 device.turn_on()
+                self.db_service.create_heatpump_action(device.relay_pin, device.device_name, HeatpumpAction.HEATPUMP_ON)
                 return True
+            else:
+                print(f"Not enough excess energy available to turn on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {min} W, energy consumption of the device: {device.energy_consumption} W")
+                self.db_service.create_heatpump_action(device.relay_pin, device.device_name, HeatpumpAction.NO_ACTION)
+                return False
         
-        print(f"Not turning on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)} W, energy consumption of the device: {device.energy_consumption} W")
+        print(f"{device.device_name} is already on.")
         return False
         
     def check_and_process_user_change(self, current_action_user: int, authenticated_user: int):
