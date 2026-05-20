@@ -102,6 +102,19 @@ class EnergyManagementApplication:
         print(f"Not turning on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)} W, energy consumption of the device: {device.energy_consumption} W")
         return False
         
+    def check_and_process_user_change(self, current_action_user: int, authenticated_user: int):
+        """
+        Check if there was a change in the authenticated user for the GoE API and process it accordingly. This is relevant for
+        the car charging control, because we want to apply different control rules depending on whether the fixed charging user
+        or the dynamic charging user is authenticated.
+        """
+        
+        print(f"##### User ID of the current action: {current_action_user}, ID of the authenticated user: {authenticated_user}")
+        
+        if current_action_user != None and authenticated_user != None and current_action_user != authenticated_user:
+            print(f"Authenticated user for GoE API has changed from user ID {current_action_user} to user ID {authenticated_user}. Processing user change.")
+            self.process_charging_finished()
+        
     def update_car_charging(self) -> ChargerAction:
         """Update on car charging through the GoE API.
         Args:
@@ -110,6 +123,9 @@ class EnergyManagementApplication:
         Returns:
             The charger action that was actually performed.
         """
+        current_user = self.goe_service.get_authenticated_user()
+        self.check_and_process_user_change(self.db_service.get_goe_action_user_id(), current_user)
+
         if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete():
             print(f"Car charging is currently allowed or the car is charging or charging was completed.")
         
@@ -127,7 +143,7 @@ class EnergyManagementApplication:
                 if available_power >= self.goe_service.MINIMUM_ENERGY_CONSUMPTION:
                     if self.db_service.is_goe_action(ChargerAction.DYNAMIC_CHARGING):
                         print(f"Dynamic charging is already active, no need to request to start dynamic charging again.")
-                        # TODO wait some time before changing the charging power
+                        # TODO optionally: wait some time before changing the charging power
                         self.goe_service.set_charging_power(available_power)
                         return ChargerAction.DYNAMIC_CHARGING
                     else:
@@ -135,12 +151,10 @@ class EnergyManagementApplication:
                             print(">>> Car charging power set to", available_power, "W")
                             # create new charging session
                             session_id = self.create_car_charging_report_entry_start()
-                            self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id)
-                            return ChargerAction.DYNAMIC_CHARGING
+                            return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
                         else:
                             print(f"!!! Failed to set car charging power to {available_power} W, will retry in {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes.")
-                            self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING)
-                            return ChargerAction.REQUEST_DYNAMIC_CHARGING
+                            return self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING, current_user)
                 else:
                     print(f"Not enough excess energy available to turn on car charging. Available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
                     # wait x minutes before switching off the car charging to make sure that the energy status is stable and there is actually not enough excess energy available. This is to avoid rapidly turning on and off the car charging due to fluctuations in energy production and consumption.
@@ -151,9 +165,9 @@ class EnergyManagementApplication:
                         session_id = self.db_service.get_goe_action_session_id()
                         print(f">>> Session ID for charging session: {session_id}")
                         if current_goe_action != ChargerAction.REQUEST_STOP_CHARGING:
-                            self.db_service.create_goe_action(ChargerAction.REQUEST_STOP_CHARGING, session_id)
+                            self.db_service.create_goe_action(ChargerAction.REQUEST_STOP_CHARGING, session_id, current_user)
 
-                        stop_charging_time = self.db_service.get_goe_action_timestamp_by_charger_id(ChargerAction.REQUEST_STOP_CHARGING)
+                        stop_charging_time = self.db_service.get_goe_action_timestamp_by_charger_action(ChargerAction.REQUEST_STOP_CHARGING)
                         if stop_charging_time is not None:
                             delta = datetime.now() - stop_charging_time
                             print(f"Time since requesting to stop dynamic charging: {delta.total_seconds() / 60:.2f} minutes")
@@ -201,27 +215,20 @@ class EnergyManagementApplication:
                         session_id = self.db_service.get_goe_action_session_id_by_charger_action(ChargerAction.MAX_CHARGING)
                         if session_id is None:
                             session_id = self.create_car_charging_report_entry_start()
-                            self.db_service.create_goe_action(ChargerAction.MAX_CHARGING, session_id)
+                            self.db_service.create_goe_action(ChargerAction.MAX_CHARGING, session_id, current_user)
                         return ChargerAction.MAX_CHARGING
                 
                 print(f"This code should not be reached: requesting max charging but setting max charging was not successful.")
-                self.db_service.create_goe_action(ChargerAction.REQUEST_MAX_CHARGING)
+                self.db_service.create_goe_action(ChargerAction.REQUEST_MAX_CHARGING, user_id=current_user)
                 return ChargerAction.REQUEST_MAX_CHARGING
                 
         else:
             print(f"Car charging is currently not allowed and the car is not charging.")
             self.sonnen_battery_service.set_enable_discharge()
-            if self.db_service.get_goe_action() == ChargerAction.MAX_CHARGING:
+            if self.db_service.get_goe_action() in [ChargerAction.MAX_CHARGING, ChargerAction.DYNAMIC_CHARGING, ChargerAction.REQUEST_STOP_CHARGING]:
                 return self.process_charging_finished()
-                
-                # session_id = self.db_service.get_goe_action_session_id_by_charger_action(ChargerAction.MAX_CHARGING)
-                # if session_id is not None:
-                #     self.create_car_charging_report_entry_end(session_id)
-                #     # self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
-                #     return ChargerAction.CHARGING_STOPPED
             
-            self.db_service.create_goe_action(ChargerAction.NO_ACTION)
-            return ChargerAction.NO_ACTION
+            return self.db_service.create_goe_action(ChargerAction.NO_ACTION, user_id=current_user)
     
     def process_charging_finished(self) -> ChargerAction:
         """Process the event of car charging being finished. This will be triggered when the GoE API indicates that the car charging was completed. The method will turn on the battery discharge to allow the battery to provide energy for home consumption, and will create a new entry in the car charging report with the end time, the energy meter value at the end of the charging session, and the calculated energy consumed during the charging session."""
@@ -230,7 +237,7 @@ class EnergyManagementApplication:
         session_id = self.db_service.get_goe_action_session_id()
         if session_id is not None:
             self.create_car_charging_report_entry_end(session_id)
-            self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, session_id)
+            self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED)
         return ChargerAction.CHARGING_STOPPED
         
     def create_car_charging_report_entry_start(self) -> int:

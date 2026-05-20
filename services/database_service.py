@@ -62,7 +62,8 @@ class DBService:
             CREATE TABLE IF NOT EXISTS goe_action (
                 action INTEGER PRIMARY KEY NOT NULL,
                 timestamp DATETIME NOT NULL,
-                session_id INTEGER
+                session_id INTEGER,
+                rfid_chip_id INTEGER
             )
         ''')
         conn.commit()
@@ -159,7 +160,7 @@ class DBService:
         conn.commit()
         conn.close()
 
-    def create_goe_action(self, action: ChargerAction, session_id: int = None):
+    def create_goe_action(self, action: ChargerAction, session_id: int = None, user_id: int = None) -> ChargerAction:
         """Create the current active GoE action in the database. Only one action can be active at a time."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -171,7 +172,7 @@ class DBService:
         # If this action is already active, keep the original timestamp.
         if existing and existing[0] == action.value:
             conn.close()
-            return
+            return action
 
         # Keep only one active action row at any time.
         cursor.execute('''
@@ -181,11 +182,12 @@ class DBService:
         timestamp = datetime.now()
         print(f"+++ Creating GoE action entry in database with action {action}, timestamp {timestamp}, session_id {session_id}")
         cursor.execute('''
-            INSERT INTO goe_action (action, timestamp, session_id)
-            VALUES (?, ?, ?)
-        ''', (action.value, timestamp, session_id))
+            INSERT INTO goe_action (action, timestamp, session_id,  rfid_chip_id)
+            VALUES (?, ?, ?, ?)
+        ''', (action.value, timestamp, session_id, user_id))
         conn.commit()
         conn.close()
+        return action
 
     def get_goe_action_timestamp(self) -> datetime:
         """Get the timestamp of when a specific GoE action was last set."""
@@ -202,8 +204,8 @@ class DBService:
         else:
             return None
 
-    def get_goe_action_timestamp_by_charger_id(self, action: ChargerAction) -> datetime:
-        """Get the timestamp of when a specific GoE action was last set for a given charger ID."""
+    def get_goe_action_timestamp_by_charger_action(self, action: ChargerAction) -> datetime:
+        """Get the timestamp of when a specific GoE action was last set for a given charger action."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -239,6 +241,21 @@ class DBService:
         cursor.execute('''
             SELECT session_id FROM goe_action WHERE action = ?
         ''', (action.value,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return result[0]
+        else:
+            return None
+
+    def get_goe_action_user_id(self) -> int:
+        """Get the user ID of the current GoE action."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT rfid_chip_id FROM goe_action
+        ''', )
         result = cursor.fetchone()
         conn.close()
 

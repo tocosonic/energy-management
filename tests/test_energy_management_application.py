@@ -168,7 +168,7 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
         app.goe_service.is_car_charging_allowed = Mock(return_value=True)
         app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
-        app.goe_service.get_last_user = Mock(return_value=(1))
+        app.goe_service.get_authenticated_user = Mock(return_value=(1))
 
         # Simulate a long-running process with varying available power.
         # 10 + 8 + 12 + 5 + 10 = 45 minutes total
@@ -227,7 +227,7 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
         app.goe_service.is_car_charging_allowed = Mock(return_value=True)
         app.goe_service.get_last_user_with_name = Mock(return_value=(1, "Fixed Charging User"))
-        app.goe_service.get_last_user = Mock(return_value=(1))
+        app.goe_service.get_authenticated_user = Mock(return_value=(1))
 
         # Simulate a long-running process with varying available power.
         # 10 + 8 + 12 + 5 + 30 = 65 minutes total
@@ -287,7 +287,7 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         # make sure, that the preconditions for car charging are met, so that the app would turn on the car charging if there is enough excess energy available
         app.goe_service.is_car_charging_allowed = Mock(return_value=True)
         app.goe_service.get_last_user_with_name = Mock(return_value=(0, "Dynamic Charging User"))
-        app.goe_service.get_last_user = Mock(return_value=(0))
+        app.goe_service.get_authenticated_user = Mock(return_value=(0))
 
         # available_power_profile = [5000] * 10
         available_power_profile = [0] * 7 + [5000] * 10 + [0] * 8 + [1400] * 12 + [0] * 5 + [7000] * 10

@@ -28,7 +28,7 @@ class GoEService:
     def get_last_user_with_name(self) -> tuple[int, str]:
         """Returns:
             The card index of the last authenticated user and the corresponding user name."""
-        last_user = self.get_last_user()
+        last_user = self.get_authenticated_user()
         last_user_name = self.get_user_name(last_user)
         return last_user, last_user_name
 
@@ -39,7 +39,7 @@ class GoEService:
         user_name = self._get_status(filter)
         return user_name
 
-    def get_last_user(self) -> int:
+    def get_authenticated_user(self) -> int:
         """Returns:
             The card index of the last authenticated user."""
         return self._get_status("lrc")
@@ -47,7 +47,7 @@ class GoEService:
     def is_dynamic_charging_user(self) -> bool:
         """Returns:
             Whether the last authenticated user is the dynamic charging user."""
-        return self.get_last_user() == self.dynamic_charging_user
+        return self.get_authenticated_user() == self.dynamic_charging_user
 
     def get_car_status(self) -> CarStatus:
         """The current status code of the car reported by the charger.
