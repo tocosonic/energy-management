@@ -339,9 +339,6 @@ class TestEnergyManagementApplicationUpdateCarChargingProcess:
         for record in history:
             print(record)
 
-
-
-
     def test_long_running_profile_fixed_and_dynamic_power(self, app_with_mocked_io: EnergyManagementApplication, frozen_time):
         print(">>> start long-running simulation of car charging process with fixed and dynamic power")
         load_dotenv()
