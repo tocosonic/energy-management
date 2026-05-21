@@ -339,27 +339,31 @@ class DBService:
             return None
 
     def create_relay_status(self, id: int, device_name: str, is_on: bool):
+        """Create or update the relay status entry in the database for a given device."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         timestamp = datetime.now()
         print(f"+++ Creating relay status entry in database for device {device_name} with id {id}, is_on {is_on}, and timestamp {timestamp}")
+        # check, if the status needs an update or not
         cursor.execute('''
-            INSERT OR IGNORE INTO relay_status (id, device_name, timestamp, is_on)
-            VALUES (?, ?, ?, ?)
-        ''', (id, device_name, timestamp, is_on))
-        conn.commit()
-        conn.close()
-
-    def update_relay_status(self, id: int, is_on: bool):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        timestamp = datetime.now()
-        print(f"+++ Updating relay status entry in database for device with id {id} to is_on {is_on} with timestamp {timestamp}")
-        cursor.execute('''
-            UPDATE relay_status
-            SET timestamp = ?, is_on = ?
-            WHERE id = ?
-        ''', (timestamp, is_on, id))
+            SELECT is_on FROM relay_status WHERE id = ? LIMIT 1
+        ''', (id,))
+        existing = cursor.fetchone()
+        if existing and existing[0] == is_on:
+            conn.close()
+            return
+        elif existing:
+            print(f"+++ Relay status entry in database for device {device_name} with id {id} already exists with is_on {existing[0]}. Updating the entry with new is_on {is_on} and timestamp {timestamp}")
+            cursor.execute('''
+                UPDATE relay_status
+                SET timestamp = ?, is_on = ?
+                WHERE id = ?
+            ''', (timestamp, is_on, id))
+        else:
+            cursor.execute('''
+                INSERT OR IGNORE INTO relay_status (id, device_name, timestamp, is_on)
+                VALUES (?, ?, ?, ?)
+            ''', (id, device_name, timestamp, is_on))
         conn.commit()
         conn.close()
 

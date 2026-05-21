@@ -4,7 +4,7 @@ Python application which reads energy production and consumption information and
 ## Supported gears
 - RaspberryPI relay board
 - Sonnen battery
-- Weishaupt warm water heat pump (via SGready)
+- Weishaupt warm water heatpump (via SGready)
 - Panasonic J-series (via SGready)
 - Go-E Pro charger
 

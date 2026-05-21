@@ -25,7 +25,13 @@ class SGReadyDeviceService:
     def _init_db_entry(self):
         """Initialize the database entry for this device if the relay_pin was set and if it doesn't exist."""
         if self.relay_pin is not None:
+            print(f"### Initializing database entry for device {self.name} with relay pin {self.relay_pin}")
             self.db_service.create_relay_status(id=self.relay_pin, device_name=self.name, is_on=self.is_on())
+
+    def _update_relay(self, is_on: bool):
+        """Update the relay pin accordingly."""
+        if self.relay_pin is not None:
+            GPIO.output(self.relay_pin, GPIO.LOW if is_on else GPIO.HIGH)
         
     def is_on(self) -> bool:
         """Get the current status of the device by reading the relay state.
@@ -44,11 +50,13 @@ class SGReadyDeviceService:
     def turn_on(self):
         """Turn on the device by setting the relay to LOW (active low)."""
         if self.relay_pin is not None:
-            GPIO.output(self.relay_pin, GPIO.LOW)
-            self.db_service.update_relay_status(id=self.relay_pin, is_on=True)
+            print(f"### Turning on device {self.name} by setting relay pin {self.relay_pin} to LOW")
+            self._update_relay(is_on=True)
+            self.db_service.create_relay_status(id=self.relay_pin, device_name=self.name, is_on=True)
 
     def turn_off(self):
         """Turn off the device by setting the relay to HIGH (active low)."""
         if self.relay_pin is not None:
-            GPIO.output(self.relay_pin, GPIO.HIGH)
-            self.db_service.update_relay_status(id=self.relay_pin, is_on=False)
+            print(f"### Turning off device {self.name} by setting relay pin {self.relay_pin} to HIGH")
+            self._update_relay(is_on=False)
+            self.db_service.create_relay_status(id=self.relay_pin, device_name=self.name, is_on=False)
