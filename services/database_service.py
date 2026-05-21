@@ -279,7 +279,7 @@ class DBService:
         current_action = self.get_goe_action()
         return current_action == action
 
-    def create_heatpump_action(self, relay_pin: int, device_name: str, action: HeatpumpAction):
+    def create_heatpump_action(self, relay_pin: int, device_name: str, action: HeatpumpAction) -> HeatpumpAction:
         """Create the current active heatpump action in the database. Only one action can be active at a time for each heat pump."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -291,7 +291,7 @@ class DBService:
         # If this action is already active, keep the original timestamp.
         if existing and existing[0] == action.value:
             conn.close()
-            return
+            return action
 
         # Keep only one active action row for each device at any time.
         cursor.execute(f'''
@@ -306,8 +306,9 @@ class DBService:
         ''', (relay_pin, device_name, action.value, timestamp))
         conn.commit()
         conn.close()
+        return action
         
-    def get_heatpump_action_timestamp(self, relay_pin: int, action: HeatpumpAction) -> datetime:
+    def get_heatpump_action_timestamp_by_heatpump_action(self, relay_pin: int, action: HeatpumpAction) -> datetime:
         """Get the timestamp of when a specific heatpump action was last set."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -319,6 +320,21 @@ class DBService:
 
         if result:
             return datetime.fromisoformat(result[0])
+        else:
+            return None
+
+    def get_heatpump_action_by_relay_pin(self, relay_pin: int) -> HeatpumpAction:
+        """Get the current heatpump action for a given relay pin."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(f'''
+            SELECT action FROM heatpump_action WHERE relay_pin = ? LIMIT 1
+        ''', (relay_pin,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return HeatpumpAction(result[0])
         else:
             return None
 

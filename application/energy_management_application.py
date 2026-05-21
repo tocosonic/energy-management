@@ -10,6 +10,7 @@ from services.goe_service import GoEService
 from services.sonnen_battery_service import SonnenBatteryService
 from services.weather_service import WeatherService
 from services.sgready_device_service import SGReadyDeviceService
+from services.panasonic_aquarea_service import PanasonicAquareaService
 from services.wago_energy_meter import WagoEnergyMeter
 
 @dataclass(frozen=True)
@@ -18,12 +19,10 @@ class ControlStructure:
     This can be used to define rules for when to turn on or off certain devices based on the current energy status, weather conditions, and Sonnen battery status.
     """
     START_WW_WAIT_TIME: int = 5
-    START_HEATING1_WAIT_TIME: int = 5
-    START_HEATING2_WAIT_TIME: int = 5
+    START_HEATING_WAIT_TIME: int = 5
     START_CAR_CHARGING_WAIT_TIME: int = 5
     STOP_WW_WAIT_TIME: int = 15
-    STOP_HEATING1_WAIT_TIME: int = 10
-    STOP_HEATING2_WAIT_TIME: int = 5
+    STOP_HEATING_WAIT_TIME: int = 10
     STOP_CAR_CHARGING_WAIT_TIME: int = 15
     NON_USED_ENERGY_BUFFER: int = 1000  # Buffer in watts to account for fluctuations in energy production and consumption. This means that the application will only turn on devices if there is at least this much excess energy available, and will only turn off devices if the energy deficit is at least this much.
 
@@ -34,8 +33,7 @@ class EnergyManagementApplication:
         self.weather_service = WeatherService(api_key=os.getenv("OPENWEATHER_API_KEY"), latitude=os.getenv("OPENWEATHER_LAT"), longitude=os.getenv("OPENWEATHER_LON"))
         self.sonnen_battery_service = SonnenBatteryService(self.db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
         self.warm_water_heatpump_service = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heat Pump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
-        self.heating_heatpump_service1 = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), "Panasonic Heating Heat Pump 1", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")))
-        self.heating_heatpump_service2 = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heat Pump 2", int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
+        self.heating_heatpump_service = PanasonicAquareaService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
         self.goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
         self.energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
         self._init_control_structure()
@@ -44,12 +42,10 @@ class EnergyManagementApplication:
         """Initializes the control structure for the energy management application."""
         self.control_structure = ControlStructure(
             START_WW_WAIT_TIME = int(os.getenv("START_WW_WAIT_TIME")),
-            START_HEATING1_WAIT_TIME = int(os.getenv("START_HEATING1_WAIT_TIME")),
-            START_HEATING2_WAIT_TIME = int(os.getenv("START_HEATING2_WAIT_TIME")),
+            START_HEATING_WAIT_TIME = int(os.getenv("START_HEATING_WAIT_TIME")),
             START_CAR_CHARGING_WAIT_TIME = int(os.getenv("START_CAR_CHARGING_WAIT_TIME")),
             STOP_WW_WAIT_TIME = int(os.getenv("STOP_WW_WAIT_TIME")),
-            STOP_HEATING1_WAIT_TIME = int(os.getenv("STOP_HEATING1_WAIT_TIME")),
-            STOP_HEATING2_WAIT_TIME = int(os.getenv("STOP_HEATING2_WAIT_TIME")),
+            STOP_HEATING_WAIT_TIME = int(os.getenv("STOP_HEATING_WAIT_TIME")),
             STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME")),
             NON_USED_ENERGY_BUFFER = int(os.getenv("NON_USED_ENERGY_BUFFER"))
         )
@@ -60,54 +56,70 @@ class EnergyManagementApplication:
             # Refresh the status of the Sonnen battery
             self.sonnen_battery_service.refresh_status()
 
-            # Turn on devices if there is enough excess energy available, starting with the most important device (warm water heat pump) and then the heating heat pumps.
-            # Only turn on one device at a time.
-            # WW heatpump
-            if not self.turn_on_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME):
-                # Heating 1
-                if not self.turn_on_heatpump(self.heating_heatpump_service1, self.control_structure.START_HEATING1_WAIT_TIME):
-                    # Heating 2
-                    self.turn_on_heatpump(self.heating_heatpump_service2, self.control_structure.START_HEATING2_WAIT_TIME)
+            self.update_heatpump(self.heating_heatpump_service, self.control_structure.START_HEATING_WAIT_TIME, self.control_structure.STOP_HEATING_WAIT_TIME)
+            self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)
 
             self.update_car_charging()
 
-            # Check whether or not the heatpumps need to be turned off due to insufficient excess energy. We will only turn off the heat pumps if they are currently on and there is not enough excess energy available for at least the specified stop wait time.
-            if self.warm_water_heatpump_service.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_WW_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.warm_water_heatpump_service.energy_consumption:
-                print(f"Turning off {self.warm_water_heatpump_service.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {self.control_structure.STOP_WW_WAIT_TIME} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_WW_WAIT_TIME)} W, energy consumption of the device: {self.warm_water_heatpump_service.energy_consumption} W")
-                self.warm_water_heatpump_service.turn_off()
-            if self.heating_heatpump_service1.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING1_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.heating_heatpump_service1.energy_consumption:
-                print(f"Turning off {self.heating_heatpump_service1.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {self.control_structure.STOP_HEATING1_WAIT_TIME} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING1_WAIT_TIME)} W, energy consumption of the device: {self.heating_heatpump_service1.energy_consumption} W")
-                self.heating_heatpump_service1.turn_off()
-            if self.heating_heatpump_service2.is_on() and self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING2_WAIT_TIME) + self.control_structure.NON_USED_ENERGY_BUFFER < self.heating_heatpump_service2.energy_consumption:
-                print(f"Turning off {self.heating_heatpump_service2.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {self.control_structure.STOP_HEATING2_WAIT_TIME} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.STOP_HEATING2_WAIT_TIME)} W, energy consumption of the device: {self.heating_heatpump_service2.energy_consumption} W")
-                self.heating_heatpump_service2.turn_off()
-
             sleep(60)  # Sleep for 60 seconds before checking again
     
-    def turn_on_heatpump(self, device: SGReadyDeviceService, wait_time: int) -> bool:
+    ######################
+    # Heatpump Section
+    ######################
+
+    def update_heatpump(self, device: SGReadyDeviceService, start_wait_time: int, stop_wait_time: int) -> HeatpumpAction:
         """
-        Turn on a heat pump.
-        Args:
-            device: The SGReadyDeviceService instance representing the heat pump to be turned on.
-            wait_time: The time in minutes to look back for the minimum grid feed-in value to determine if there is enough excess energy to turn on the device.
-        Returns:
-            True if the device was turned on, False otherwise.
+        Update the status of a heat pump based on the current energy status and the control structure.
+        Returns: The heatpump action that was actually performed.
         """
-        if not device.is_on():
-            min = self.sonnen_battery_service.get_grid_feed_in_minimum(wait_time)
-            if min - self.control_structure.NON_USED_ENERGY_BUFFER >= device.energy_consumption:
-                print(f"Turning on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {min} W, energy consumption of the device: {device.energy_consumption} W")
+        
+        min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(start_wait_time)
+        consumed_power = device.energy_consumption if device.is_on() else 0
+        available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power
+        if available_power >= device.energy_consumption:
+            if not device.is_on():
+                print(f"{device.device_name} is currently off, but there is enough excess energy available to turn it on. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
                 device.turn_on()
-                self.db_service.create_heatpump_action(device.relay_pin, device.device_name, HeatpumpAction.HEATPUMP_ON)
-                return True
+                return self.db_service.create_heatpump_action(device.relay_pin, device.device_name, HeatpumpAction.HEATPUMP_ON)
             else:
-                print(f"Not enough excess energy available to turn on {device.device_name}. Minimum grid feed-in in the last {wait_time} minutes: {min} W, energy consumption of the device: {device.energy_consumption} W")
-                self.db_service.create_heatpump_action(device.relay_pin, device.device_name, HeatpumpAction.NO_ACTION)
-                return False
-        
-        print(f"{device.device_name} is already on.")
-        return False
-        
+                print(f"{device.device_name} is currently on and there is enough excess energy available to keep it turned on. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
+                return HeatpumpAction.HEATPUMP_ON
+        else:
+            print(f"Not enough excess energy available to turn on or keep on {device.device_name}. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
+            if device.is_on():
+                print(f"Turning off {device.device_name} due to insufficient excess energy. Minimum grid feed-in in the last {stop_wait_time} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(stop_wait_time)} W, energy consumption of the device: {device.energy_consumption} W")
+                
+                current_action = self.db_service.get_heatpump_action_by_relay_pin(device.relay_pin)
+                if current_action in [HeatpumpAction.REQUEST_HEATPUMP_OFF, HeatpumpAction.HEATPUMP_ON, HeatpumpAction.REQUEST_HEATPUMP_ON]:
+                    if current_action != HeatpumpAction.REQUEST_HEATPUMP_OFF:
+                        self.db_service.create_heatpump_action(device.relay_pin, device.device_name, HeatpumpAction.REQUEST_HEATPUMP_OFF)
+
+                    stop_time = self.db_service.get_heatpump_action_timestamp_by_heatpump_action(device.relay_pin, HeatpumpAction.REQUEST_HEATPUMP_OFF)
+                    if stop_time is not None:
+                        delta = datetime.now() - stop_time
+                        elapsed_time = int(delta.total_seconds() / 60)
+                        print(f"Time since requesting to stop the heatpump {device.device_name}: {delta.total_seconds() / 60:.2f} minutes")
+                        if elapsed_time >= stop_wait_time:
+                            print(f">>>> Stop wait time of {elapsed_time} minutes has passed since the last request to turn off {device.device_name}. Proceeding to turn off the device.")
+                            device.turn_off()
+                            self.db_service.create_heatpump_action(device.relay_pin, device.device_name, HeatpumpAction.HEATPUMP_OFF)
+                            return HeatpumpAction.REQUEST_HEATPUMP_OFF
+                            
+                        return HeatpumpAction.REQUEST_HEATPUMP_OFF
+                    else:
+                        print(f"No previous request to turn off {device.device_name} found.")
+                        return HeatpumpAction.REQUEST_HEATPUMP_OFF
+                else:
+                    print(f"Current action for {device.device_name} is {current_action}, so no need to request to turn off the device now.")
+                    return HeatpumpAction.NO_ACTION
+                
+            print(f"{device.device_name} is currently off, so no need to turn it off due to insufficient excess energy.")
+            return HeatpumpAction.NO_ACTION
+
+    ######################
+    # Car Charging Section
+    ######################
+            
     def check_and_process_user_change(self, current_action_user: int, authenticated_user: int):
         """
         Check if there was a change in the authenticated user for the GoE API and process it accordingly. This is relevant for
@@ -144,7 +156,8 @@ class EnergyManagementApplication:
                 
                 # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
                 min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
-                available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + self.goe_service.get_current_charging_power()
+                consumed_power = self.goe_service.get_current_charging_power()
+                available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power
                 print(f"Minimum grid feed-in: {min_power} W, available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
                 if available_power >= self.goe_service.MINIMUM_ENERGY_CONSUMPTION:
                     if self.db_service.is_goe_action(ChargerAction.DYNAMIC_CHARGING):
@@ -178,8 +191,8 @@ class EnergyManagementApplication:
                             delta = datetime.now() - stop_charging_time
                             print(f"Time since requesting to stop dynamic charging: {delta.total_seconds() / 60:.2f} minutes")
                             
-                            time_since_action = int(delta.total_seconds() / 60)
-                            if time_since_action >= self.control_structure.STOP_CAR_CHARGING_WAIT_TIME:
+                            elapsed_time = int(delta.total_seconds() / 60)
+                            if elapsed_time >= self.control_structure.STOP_CAR_CHARGING_WAIT_TIME:
                                 print(">>>> Now it's time to stop charging")
                                 if self.goe_service.set_charging_power(0):
                                     print(">>> Car charging stopped")
@@ -187,7 +200,7 @@ class EnergyManagementApplication:
                                 else:
                                     print(f"Failed to stop car charging, will retry in {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME} minutes.")
 
-                        print(f"Waiting {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME - time_since_action:.2f} more minutes before stopping the car charging to make sure that the energy status is stable.")
+                        print(f"Waiting {self.control_structure.STOP_CAR_CHARGING_WAIT_TIME - elapsed_time:.2f} more minutes before stopping the car charging to make sure that the energy status is stable.")
                         return ChargerAction.REQUEST_STOP_CHARGING
                     else:
                         print(f"Car charging is currently not active, no need to request to stop the car charging due to insufficient excess energy.")
