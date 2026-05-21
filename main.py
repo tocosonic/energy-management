@@ -1,4 +1,5 @@
 # main.py
+from datetime import datetime
 import os
 from time import sleep
 import RPi.GPIO as GPIO
@@ -15,12 +16,62 @@ from services.sgready_device_service import SGReadyDeviceService
 from services.database_service import DBService
 
 def main():
+    """
+    Main function to initialize the energy management application and run it.
+    Installation as service:
+    1. Create a systemd service file at `/etc/systemd/system/energy-management.service` with the following content:
+    
+        [Unit]
+        Description=Energy Management Application
+        After=network.target
+        
+        [Service]
+        ExecStart=/usr/bin/python3 /path/to/your/main.py
+        Restart=always
+        RestartSec=5
+        User=your_user
+        Group=your_group
+        EnvironmentFile=/path/to/your/.env
+        
+        [Install]
+        WantedBy=multi-user.target
+        
+    2. Reload systemd to recognize the new service:
+        
+        sudo systemctl daemon-reload
+        
+    3. Enable the service to start on boot:
+    
+        sudo systemctl enable energy-management.service
+    
+    4. Start the service:
+    
+        sudo systemctl start energy-management.service
+        
+    5. Check the status of the service:
+    
+        sudo systemctl status energy-management.service
+        
+    6. View logs for the service:
+    
+        sudo journalctl -u energy-management.service -f
+    
+    """
+    
     app = EnergyManagementApplication()
-    # app.run()
+    app.run()
     
     
-    
+    # this code is for testing purposes and will be removed in the future, as we want to run the application as a service without any output to the console
     load_dotenv()  # Load environment variables from .env file
+
+    print(f"Sunrise and sunset times: {app.weather_service.sunrise_sunset}")
+    sunset = app.weather_service.sunrise_sunset[1]
+    sunrise = app.weather_service.sunrise_sunset[0]
+    sunset_time = datetime.fromtimestamp(sunset)
+    sunrise_time = datetime.fromtimestamp(sunrise)
+    print(f"Sunset time: {sunset_time}")
+    print(f"Sunrise time: {sunrise_time}")
 
     em = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
     total_energy = em.get_total_energy_kwh()

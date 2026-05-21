@@ -77,9 +77,13 @@ class EnergyManagementApplication:
         consumed_power = device.energy_consumption if device.is_on() else 0
         available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power
         if available_power >= device.energy_consumption:
-            if not device.is_on():
+            close_to_sunset = self.weather_service.is_close_to_sunset()
+            if not device.is_on() and not close_to_sunset:
                 print(f"{device.name} is currently off, but there is enough excess energy available to turn it on. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
                 device.turn_on()
+            elif close_to_sunset:
+                print(f"{device.name} is currently on or off - but it is close to sunset. Not turning it on to avoid unnecessary energy consumption.")
+                return HeatpumpAction.NO_ACTION
             else:
                 print(f"{device.name} is currently on and there is enough excess energy available to keep it turned on. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
                 
