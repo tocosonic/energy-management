@@ -33,6 +33,10 @@ class SGReadyDeviceService:
         if self.relay_pin is not None:
             GPIO.output(self.relay_pin, GPIO.LOW if is_on else GPIO.HIGH)
         
+    def get_id(self) -> int:
+        """Get the ID of the device, which is the same as the relay pin number."""
+        return self.relay_pin
+        
     def is_on(self) -> bool:
         """Get the current status of the device by reading the relay state.
         Returns:

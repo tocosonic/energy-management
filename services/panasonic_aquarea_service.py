@@ -10,6 +10,10 @@ class PanasonicAquareaService(SGReadyDeviceService):
         self.relay_1 = SGReadyDeviceService(db_service, relay_pin_1, f"{device_name} Relay 1", energy_consumption_mode_1)
         self.relay_2 = SGReadyDeviceService(db_service, relay_pin_2, f"{device_name} Relay 2", energy_consumption_mode_2)
         
+    def get_id(self) -> int:
+        """Get the ID of the device, which is a combination of both relay IDs."""
+        return (self.relay_1.get_id() * 100) + self.relay_2.get_id()
+    
     def is_on(self) -> bool:
         return self.relay_1.is_on() or self.relay_2.is_on()
     

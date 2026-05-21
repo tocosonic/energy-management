@@ -80,22 +80,21 @@ class EnergyManagementApplication:
             if not device.is_on():
                 print(f"{device.name} is currently off, but there is enough excess energy available to turn it on. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
                 device.turn_on()
-                # return self.db_service.create_heatpump_action(device.relay_pin, device.name, HeatpumpAction.HEATPUMP_ON)
             else:
                 print(f"{device.name} is currently on and there is enough excess energy available to keep it turned on. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
-                # return HeatpumpAction.HEATPUMP_ON
-            return self.db_service.create_heatpump_action(device.relay_pin, device.name, HeatpumpAction.HEATPUMP_ON)
+                
+            return self.db_service.create_heatpump_action(device.get_id(), device.name, HeatpumpAction.HEATPUMP_ON)
         else:
             print(f"Not enough excess energy available to turn on or keep on {device.name}. Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, available power for the device after buffer: {available_power} W, energy consumption of the device: {device.energy_consumption} W")
             if device.is_on():
                 print(f"Turning off {device.name} due to insufficient excess energy. Minimum grid feed-in in the last {stop_wait_time} minutes: {self.sonnen_battery_service.get_grid_feed_in_minimum(stop_wait_time)} W, energy consumption of the device: {device.energy_consumption} W")
                 
-                current_action = self.db_service.get_heatpump_action_by_relay_pin(device.relay_pin)
+                current_action = self.db_service.get_heatpump_action_by_id(device.get_id())
                 if current_action in [HeatpumpAction.REQUEST_HEATPUMP_OFF, HeatpumpAction.HEATPUMP_ON, HeatpumpAction.REQUEST_HEATPUMP_ON]:
                     if current_action != HeatpumpAction.REQUEST_HEATPUMP_OFF:
-                        self.db_service.create_heatpump_action(device.relay_pin, device.name, HeatpumpAction.REQUEST_HEATPUMP_OFF)
+                        self.db_service.create_heatpump_action(device.get_id(), device.name, HeatpumpAction.REQUEST_HEATPUMP_OFF)
 
-                    stop_time = self.db_service.get_heatpump_action_timestamp_by_heatpump_action(device.relay_pin, HeatpumpAction.REQUEST_HEATPUMP_OFF)
+                    stop_time = self.db_service.get_heatpump_action_timestamp_by_heatpump_action(device.get_id(), HeatpumpAction.REQUEST_HEATPUMP_OFF)
                     if stop_time is not None:
                         delta = datetime.now() - stop_time
                         elapsed_time = int(delta.total_seconds() / 60)
@@ -103,7 +102,7 @@ class EnergyManagementApplication:
                         if elapsed_time >= stop_wait_time:
                             print(f">>>> Stop wait time of {elapsed_time} minutes has passed since the last request to turn off {device.name}. Proceeding to turn off the device.")
                             device.turn_off()
-                            return self.db_service.create_heatpump_action(device.relay_pin, device.name, HeatpumpAction.HEATPUMP_OFF)
+                            return self.db_service.create_heatpump_action(device.get_id(), device.name, HeatpumpAction.HEATPUMP_OFF)
                             
                         return HeatpumpAction.REQUEST_HEATPUMP_OFF
                     else:

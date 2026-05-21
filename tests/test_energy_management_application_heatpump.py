@@ -200,3 +200,45 @@ class TestEnergyManagementApplicationUpdateHeatpumpProcess:
         print("History of heatpump actions:")
         for record in history:
             print(record)
+
+    def test_long_running_profile_heater_heatpump(self, app_with_mocked_io: EnergyManagementApplication, frozen_time):
+        print(">>> start long-running simulation of heater heatpump process with varying power")
+        
+        app = app_with_mocked_io
+
+        # Simulate a long-running process with varying available power.
+        # 10 + 17 + 12 + 5 + 10 = 54 minutes total
+        available_power_profile = [5000] * 10 + [0] * 17 + [1400] * 12 + [0] * 5 + [7000] * 10
+        history: list[dict[str, int | bool]] = []
+
+        frozen_time_start = TEST_START_TIME + timedelta(minutes=120) # Start at a fixed time for consistent testing
+        frozen_time.move_to(frozen_time_start)
+        
+        app.heating_heatpump_service.is_on = Mock(return_value=False)  # Start with heatpump off
+
+        for minute, available_power in enumerate(available_power_profile):
+            # datetime.now needs to be mocked to simulate the waiting times for starting and stopping the car charging process. The waiting times are defined in the environment variables START_CAR_CHARGING_WAIT_TIME and STOP_CAR_CHARGING_WAIT_TIME, which are set to 7 and 15 minutes respectively in the test environment variables. So we need to simulate a time progression of at least 22 minutes to test both the starting and stopping process of the car charging.
+            frozen_time.move_to(frozen_time_start + timedelta(minutes=minute))
+
+            grid_feed_in = available_power
+            consumption = 1500
+            production = consumption + grid_feed_in  # Ensure that there is some excess energy available for charging
+            self._set_sonnen_battery_power(app, production, grid_feed_in, consumption)
+
+            action = app.update_heatpump(app.heating_heatpump_service, app.control_structure.START_HEATING_WAIT_TIME, app.control_structure.STOP_HEATING_WAIT_TIME)
+            if action in [HeatpumpAction.HEATPUMP_ON, HeatpumpAction.REQUEST_HEATPUMP_OFF]:
+                app.heating_heatpump_service.is_on = Mock(return_value=True)  # Mock heatpump status to on after it has been turned on
+            elif action in [HeatpumpAction.HEATPUMP_OFF, HeatpumpAction.REQUEST_HEATPUMP_ON]:
+                app.heating_heatpump_service.is_on = Mock(return_value=False)  # Mock heatpump status to off after it has been turned off
+            
+            history.append(
+                {
+                    "minute": minute,
+                    "available_power": available_power,
+                    "heatpump_action": action,
+                }
+            )
+            
+        print("History of heating heatpump actions:")
+        for record in history:
+            print(record)

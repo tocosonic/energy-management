@@ -71,7 +71,7 @@ class DBService:
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS heatpump_action (
-                relay_pin INTEGER PRIMARY KEY NOT NULL,
+                id INTEGER PRIMARY KEY NOT NULL,
                 device_name TEXT NOT NULL,
                 action INTEGER NOT NULL,
                 timestamp DATETIME NOT NULL
@@ -279,13 +279,13 @@ class DBService:
         current_action = self.get_goe_action()
         return current_action == action
 
-    def create_heatpump_action(self, relay_pin: int, device_name: str, action: HeatpumpAction) -> HeatpumpAction:
+    def create_heatpump_action(self, id: int, device_name: str, action: HeatpumpAction) -> HeatpumpAction:
         """Create the current active heatpump action in the database. Only one action can be active at a time for each heat pump."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(f'''
-            SELECT action FROM heatpump_action WHERE relay_pin = ? LIMIT 1
-        ''', (relay_pin,))
+            SELECT action FROM heatpump_action WHERE id = ? LIMIT 1
+        ''', (id,))
         existing = cursor.fetchone()
 
         # If this action is already active, keep the original timestamp.
@@ -295,26 +295,26 @@ class DBService:
 
         # Keep only one active action row for each device at any time.
         cursor.execute(f'''
-            DELETE FROM heatpump_action where relay_pin = ?
-        ''', (relay_pin,))
+            DELETE FROM heatpump_action where id = ?
+        ''', (id,))
 
         timestamp = datetime.now()
-        print(f"+++ Creating heatpump action entry for device {device_name} with relay pin {relay_pin} in database for table heatpump_action with action {action} and timestamp {timestamp}")
+        print(f"+++ Creating heatpump action entry for device {device_name} with id {id} in database for table heatpump_action with action {action} and timestamp {timestamp}")
         cursor.execute(f'''
-            INSERT INTO heatpump_action (relay_pin, device_name, action, timestamp)
+            INSERT INTO heatpump_action (id, device_name, action, timestamp)
             VALUES (?, ?, ?, ?)
-        ''', (relay_pin, device_name, action.value, timestamp))
+        ''', (id, device_name, action.value, timestamp))
         conn.commit()
         conn.close()
         return action
         
-    def get_heatpump_action_timestamp_by_heatpump_action(self, relay_pin: int, action: HeatpumpAction) -> datetime:
+    def get_heatpump_action_timestamp_by_heatpump_action(self, id: int, action: HeatpumpAction) -> datetime:
         """Get the timestamp of when a specific heatpump action was last set."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(f'''
-            SELECT timestamp FROM heatpump_action WHERE relay_pin = ? AND action = ? LIMIT 1
-        ''', (relay_pin, action.value))
+            SELECT timestamp FROM heatpump_action WHERE id = ? AND action = ? LIMIT 1
+        ''', (id, action.value))
         result = cursor.fetchone()
         conn.close()
 
@@ -323,13 +323,13 @@ class DBService:
         else:
             return None
 
-    def get_heatpump_action_by_relay_pin(self, relay_pin: int) -> HeatpumpAction:
-        """Get the current heatpump action for a given relay pin."""
+    def get_heatpump_action_by_id(self, id: int) -> HeatpumpAction:
+        """Get the current heatpump action for a given id."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute(f'''
-            SELECT action FROM heatpump_action WHERE relay_pin = ? LIMIT 1
-        ''', (relay_pin,))
+            SELECT action FROM heatpump_action WHERE id = ? LIMIT 1
+        ''', (id,))
         result = cursor.fetchone()
         conn.close()
 
