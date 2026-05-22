@@ -1,6 +1,6 @@
 import os
 
-from nicegui import ui
+from nicegui import ui, app
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from services.database_service import DBService, HeatpumpAction
@@ -26,10 +26,14 @@ class EnergyManagementUI:
         self.sonnen_battery_service = sonnen_battery_service
 
     def run(self):
-        ui.run()
+        app.add_static_files("/static", "static")
+        ui.run(title="Energy Status Dashboard", favicon="static/energy_status_dashboard.ico")
         
     @ui.page("/")
     def main_page():
+        sonnen_battery_service.refresh_status()  # Refresh the status to get the latest data
+
+        ui.add_head_html('<link rel="apple-touch-icon" href="static/apple-touch-icon.png">')        
         with ui.grid(columns="10px 100px auto").style("padding: 10px;"):
             # Car Charging
             ui.label("Car Charging").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
@@ -62,21 +66,21 @@ class EnergyManagementUI:
             ui.label("Yes" if discharging_allowed else "No").style("font-size: 16px; margin-top: 0px;")
         
             # WW Heatpump
-            ui.label("Warm Water Heatpump").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
+            ui.label(f"{ww_heatpump_service.name}").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ww_status = db_service.get_heatpump_status_by_id(ww_heatpump_service.get_id())
             ui.label(f"{ww_status.action.name} (since {ww_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
         
             # Heating Heatpump
-            ui.label("Heating Heatpump").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
+            ui.label(f"{heating_heatpump_service.name}").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             heating_status = db_service.get_heatpump_status_by_id(heating_heatpump_service.get_id())
             ui.label(f"{heating_status.action.name} (since {heating_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
             
         with ui.header(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
-            ui.label("Energy Management Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
+            ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
             
             energy_status = db_service.get_energy_status_time_series(60)  # Get energy status for the last 60 minutes
             if energy_status:
@@ -90,11 +94,11 @@ class EnergyManagementUI:
                     "data": [
                         {"x": timestamps, "y": energy_productions, "type": "line", "name": "Prod.", "line": {"color": "green"}},
                         {"x": timestamps, "y": energy_consumptions, "type": "line", "name": "Cons.", "line": {"color": "red"}},
-                        {"x": timestamps, "y": energy_feed_ins, "type": "line", "name": "Feed-in", "line": {"color": "blue"}},
+                        {"x": timestamps, "y": energy_feed_ins, "type": "line", "name": "Avail.", "line": {"color": "blue"}},
                     ],
                     "layout": {
                         "margin": {"t": 0, "r": 0, "b": 18, "l": 40},
-                        "plot_bgcolor": "#f5f5f5",
+                        "plot_bgcolor": "#f8f8f8",
                         "paper_bgcolor": "#f0f0f0",
                         "yaxis": {"title": {"text": "Power (kW)"}}
                     },
@@ -108,18 +112,13 @@ class EnergyManagementUI:
             else:
                 ui.label("No energy data available").style("color: #666;")
             
-            
-            
         with ui.footer(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
-            # ui.label("© 2026 Michael Hinkel").style("color: #666;")
-            
             # Fetch current energy production from the database
-            sonnen_battery_service.refresh_status()  # Refresh the status to get the latest data
             energy_production = sonnen_battery_service.get_energy_production() / 1000
             energy_consumption = sonnen_battery_service.get_energy_consumption() / 1000
             available_energy = sonnen_battery_service.get_grid_feed() / 1000
             available_energy_min = sonnen_battery_service.get_grid_feed_in_minimum(STOP_CAR_CHARGING_WAIT_TIME) / 1000
-            ui.label(f"Production: {energy_production} kWh").style("color: #666;")
-            ui.label(f"Consumption: {energy_consumption} kWh").style("color: #666;")
-            ui.label(f"Available: {available_energy} kWh").style("color: #666;")
-            ui.label(f"Min. Available ({STOP_CAR_CHARGING_WAIT_TIME} min): {available_energy_min} kWh").style("color: #666;")
+            ui.label(f"Production: {energy_production} kW").style("color: #666;")
+            ui.label(f"Consumption: {energy_consumption} kW").style("color: #666;")
+            ui.label(f"Available: {available_energy} kW").style("color: #666;")
+            ui.label(f"Min. Available ({STOP_CAR_CHARGING_WAIT_TIME} min): {available_energy_min} kW").style("color: #666;")

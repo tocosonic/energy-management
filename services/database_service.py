@@ -1,8 +1,10 @@
+import logging
 from enum import Enum
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+log = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class EnergyStatus:
@@ -127,7 +129,7 @@ class DBService:
         """Create a new car charging entry in the database when a charging session starts. Returns the session ID of the created entry."""
         conn = sqlite3.connect(self.db_path)
         start_time = datetime.now()
-        print(f"+++ Creating car charging entry in database with charger_sn {charger_sn}, charger_name {charger_name}, rfid_chip_id {rfid_chip_id}, rfid_chip_name {rfid_chip_name}, start_time {start_time}, energy_meter_start {energy_meter_start} Wh")
+        log.debug(f"Creating car charging entry in database with charger s/n {charger_sn}, charger_name {charger_name}, rfid_chip_id {rfid_chip_id}, rfid_chip_name {rfid_chip_name}, start_time {start_time}, energy_meter_start {energy_meter_start} Wh")
         # TODO update to close a non-closed previous entry for the same charger
 
 
@@ -146,14 +148,14 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         end_time = datetime.now()
-        print(f"+++ Ending car charging entry in database for session ID {session_id} with end_time {end_time} and energy_meter_end {energy_meter_end} Wh")
+        log.debug(f"Ending car charging entry in database for session ID {session_id} with end_time {end_time} and energy_meter_end {energy_meter_end} Wh")
         cursor.execute('''
             SELECT start_time, energy_meter_start FROM car_charging_report WHERE id = ?
         ''', (session_id,))
         result = cursor.fetchone()
 
         if not result:
-            print(f"No car charging entry found with session ID {session_id}")
+            log.warning(f"No car charging entry found with session ID {session_id}")
             conn.close()
             return
 
@@ -189,7 +191,7 @@ class DBService:
         ''')
 
         timestamp = datetime.now()
-        print(f"+++ Creating GoE action entry in database with action {action}, timestamp {timestamp}, session_id {session_id}")
+        log.debug(f"Creating GoE action entry in database with action {action}, timestamp {timestamp}, session_id {session_id}")
         cursor.execute('''
             INSERT INTO goe_action (action, timestamp, session_id,  rfid_chip_id)
             VALUES (?, ?, ?, ?)
@@ -333,7 +335,7 @@ class DBService:
         ''', (id,))
 
         timestamp = datetime.now()
-        print(f"+++ Creating heatpump action entry for device {device_name} with id {id} in database for table heatpump_action with action {action} and timestamp {timestamp}")
+        log.debug(f"Creating heatpump action entry for device {device_name} with id {id} in database for table heatpump_action with action {action} and timestamp {timestamp}")
         cursor.execute(f'''
             INSERT INTO heatpump_action (id, device_name, action, timestamp)
             VALUES (?, ?, ?, ?)
@@ -374,7 +376,7 @@ class DBService:
 
     def get_heatpump_status_by_id(self, id: int) -> HeatpumpStatus:
         """Get the current heatpump status for a given heatpump id."""
-        print(f"+++ Fetching heatpump status from database for heatpump with id {id}")
+        log.debug(f"Fetching heatpump status from database for heatpump with id {id}")
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -399,7 +401,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         timestamp = datetime.now()
-        print(f"+++ Creating relay status entry in database for device {device_name} with id {id}, is_on {is_on}, and timestamp {timestamp}")
+        log.debug(f"Creating relay status entry in database for device {device_name} with id {id}, is_on {is_on}, and timestamp {timestamp}")
         # check, if the status needs an update or not
         cursor.execute('''
             SELECT is_on FROM relay_status WHERE id = ? LIMIT 1
@@ -409,7 +411,7 @@ class DBService:
             conn.close()
             return
         elif existing:
-            print(f"+++ Relay status entry in database for device {device_name} with id {id} already exists with is_on {existing[0]}. Updating the entry with new is_on {is_on} and timestamp {timestamp}")
+            log.debug(f"Relay status entry in database for device {device_name} with id {id} already exists with is_on {existing[0]}. Updating the entry with new is_on {is_on} and timestamp {timestamp}")
             cursor.execute('''
                 UPDATE relay_status
                 SET timestamp = ?, is_on = ?
@@ -425,7 +427,7 @@ class DBService:
 
     def get_updated_relay_timestamp(self, id: int) -> datetime:
         """Get the timestamp of the last status update for a relay device."""
-        
+        log.debug(f"Fetching updated relay timestamp from database for relay with id {id}")
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
@@ -444,7 +446,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         timestamp = datetime.now()
-        print(f"+++ Creating energy status entry in database with timestamp {timestamp}, production {production} W, consumption {consumption} W, feed_in {feed_in} W")
+        log.debug(f"Creating energy status entry in database with timestamp {timestamp}, production {production} W, consumption {consumption} W, feed_in {feed_in} W")
         cursor.execute('''
             INSERT INTO energy_status (timestamp, production, consumption, feed_in)
             VALUES (?, ?, ?, ?)
@@ -459,7 +461,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cutoff_time = datetime.now() - timedelta(minutes=minutes)
-        print(f"+++ Fetching energy status entries from database since cutoff time {cutoff_time}")
+        log.debug(f"Fetching energy status entries from database since cutoff time {cutoff_time}")
         cursor.execute('''
             SELECT timestamp, production, consumption, feed_in
             FROM energy_status
@@ -484,7 +486,7 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cutoff_time = datetime.now() - timedelta(minutes=minutes)
-        print(f"+++ Cleaning up old energy status entries from database before cutoff time {cutoff_time}")
+        log.debug(f"Cleaning up old energy status entries from database before cutoff time {cutoff_time}")
         cursor.execute('''
             DELETE FROM energy_status WHERE timestamp < ?
         ''', (cutoff_time,))

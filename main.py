@@ -4,6 +4,9 @@ import argparse
 from nicegui import ui
 from datetime import datetime
 import os
+import logging
+import logging.config
+import yaml
 from time import sleep
 import RPi.GPIO as GPIO
 
@@ -17,6 +20,13 @@ from services.wago_energy_meter import WagoEnergyMeter
 from services.weather_service import WeatherService
 from services.sgready_device_service import SGReadyDeviceService
 from services.database_service import DBService
+
+with open("logging.yaml", "r") as f:
+    config = yaml.safe_load(f)
+    logging.config.dictConfig(config)
+
+log = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 def main(bypass_run: bool = False, start_ui: bool = False):
     """
@@ -62,14 +72,15 @@ def main(bypass_run: bool = False, start_ui: bool = False):
     """
     
     if start_ui:
-        print("Starting UI instance")
+        log.info("Starting UI instance")
         appUI = EnergyManagementUI()
         appUI.run()
     elif not bypass_run:
+        log.info("Starting EnergyManagementApplication")
         app = EnergyManagementApplication()
         app.run()
     else:
-        print("Bypassing EnergyManagementApplication.run().")
+        log.info("Bypassing EnergyManagementApplication.run().")
     
         app = EnergyManagementApplication()
     

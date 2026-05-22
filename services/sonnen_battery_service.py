@@ -1,7 +1,10 @@
+import logging
 import json
 import requests
 
 from services.database_service import DBService, EnergyStatus
+
+log = logging.getLogger(__name__)
 
 class SonnenBatteryService:
     def __init__(self, db_service: DBService, host, port, api_key):
@@ -22,10 +25,10 @@ class SonnenBatteryService:
             if response.status_code == 200:
                 self.sonnen_status = response.json()
             else:                
-                print(f"Error fetching status of Sonnen battery: {response.status_code} - {response.text}")
+                log.error(f"Error fetching status of Sonnen battery: {response.status_code} - {response.text}")
                 self.sonnen_status = None
         except Exception as e:
-            print(f"Error fetching status of Sonnen battery: {e}")
+            log.error(f"Error fetching status of Sonnen battery: {e}")
             self.sonnen_status = None
             
         self._save_status_to_db()
@@ -106,8 +109,8 @@ class SonnenBatteryService:
             
             response = requests.put(url, headers=headers, json=data)
             if response.status_code == 200:
-                print(f"Successfully set disable discharge to {disable}")
+                log.debug(f"Successfully set disable discharge to {disable}")
             else:
-                print(f"Error setting disable discharge: {response.status_code} - {response.text}")
+                log.error(f"Error setting disable discharge: {response.status_code} - {response.text}")
         except Exception as e:
-            print(f"Error setting disable discharge: {e}")
+            log.error(f"Error setting disable discharge: {e}")

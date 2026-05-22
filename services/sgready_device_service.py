@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime
 import RPi.GPIO as GPIO
 
 from services.database_service import DBService
+
+log = logging.getLogger(__name__)
 
 class SGReadyDeviceService:
     """Service for controlling SG-Ready devices (e.g. heat pumps) via relays connected to the Raspberry Pi.
@@ -25,7 +28,7 @@ class SGReadyDeviceService:
     def _init_db_entry(self):
         """Initialize the database entry for this device if the relay_pin was set and if it doesn't exist."""
         if self.relay_pin is not None:
-            print(f"### Initializing database entry for device {self.name} with relay pin {self.relay_pin}")
+            log.debug(f"Initializing database entry for device {self.name} with relay pin {self.relay_pin}")
             self.db_service.create_relay_status(id=self.relay_pin, device_name=self.name, is_on=self.is_on())
 
     def _update_relay(self, is_on: bool):
@@ -54,13 +57,13 @@ class SGReadyDeviceService:
     def turn_on(self):
         """Turn on the device by setting the relay to LOW (active low)."""
         if self.relay_pin is not None:
-            print(f"### Turning on device {self.name} by setting relay pin {self.relay_pin} to LOW")
+            log.debug(f"Turning on device {self.name} by setting relay pin {self.relay_pin} to LOW")
             self._update_relay(is_on=True)
             self.db_service.create_relay_status(id=self.relay_pin, device_name=self.name, is_on=True)
 
     def turn_off(self):
         """Turn off the device by setting the relay to HIGH (active low)."""
         if self.relay_pin is not None:
-            print(f"### Turning off device {self.name} by setting relay pin {self.relay_pin} to HIGH")
+            log.debug(f"Turning off device {self.name} by setting relay pin {self.relay_pin} to HIGH")
             self._update_relay(is_on=False)
             self.db_service.create_relay_status(id=self.relay_pin, device_name=self.name, is_on=False)

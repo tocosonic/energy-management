@@ -1,8 +1,10 @@
 from enum import Enum
-
+import logging
 import requests
 import math
 import time
+
+log = logging.getLogger(__name__)
 
 class CarStatus(Enum):
     UNKNOWN_ERROR = 0
@@ -103,7 +105,7 @@ class GoEService:
             case 2:
                 return 3
             case _:
-                print(f"Unknown phase mode: {ret}")
+                log.warning(f"Unknown phase mode: {ret}")
                 return -1
 
     def get_charging_current(self) -> int:
@@ -164,10 +166,10 @@ class GoEService:
             if response.status_code == 200:
                 return response.json().get(filter)
             else:
-                print(f"Error getting status for filter '{filter}': {response.status_code} - {response.text}")
+                log.error(f"Error getting status for filter '{filter}': {response.status_code} - {response.text}")
                 return None
         except Exception as e:
-            print(f"Error getting status for filter '{filter}': {e}")
+            log.error(f"Error getting status for filter '{filter}': {e}")
             return None
 
     def _update_setting(self, key, value) -> bool:
@@ -188,10 +190,10 @@ class GoEService:
             if response.status_code == 200:
                 return True
             else:
-                print(f"Error updating setting '{key}': {response.status_code} - {response.text}")
+                log.error(f"Error updating setting '{key}': {response.status_code} - {response.text}")
                 return False
         except Exception as e:
-            print(f"Error updating setting '{key}': {e}")
+            log.error(f"Error updating setting '{key}': {e}")
             return False
 
     def _get_sleep_time(self) -> int:
@@ -224,7 +226,7 @@ class GoEService:
         Returns:
             True if the update succeeded, otherwise False.
         """
-        print(">>> Setting charging phases to", phases)
+        log.debug(f"Setting charging phases to {phases}")
         
         current_phases = self._get_phases()
         is_car_charging = self.is_car_charging()
@@ -245,7 +247,7 @@ class GoEService:
                 case 3:
                     ret = self._update_setting("psm", 2)
                 case _:
-                    print(f"Invalid number of phases: {phases}. Only 0 (auto), 1 and 3 are allowed.")
+                    log.error(f"Invalid number of phases: {phases}. Only 0 (auto), 1 and 3 are allowed.")
                     ret = False
         
             # turn on charging again if it was on before
@@ -263,10 +265,10 @@ class GoEService:
         Returns:
             True if the update was applied and succeeded, otherwise False.
         """
-        print(">>> Setting charging current to", current)
+        log.debug(f"Setting charging current to {current}")
         
         if current < 6 or current > 16:
-            print(f"Invalid charging current: {current}. Only values between 6 and 16 are allowed.")
+            log.error(f"Invalid charging current: {current}. Only values between 6 and 16 are allowed.")
             return False
         elif self.get_charging_current() != current:
             return self._update_setting("amp", current)
@@ -290,7 +292,7 @@ class GoEService:
         """
         total_current_required = power / 230  # convert energy in watts to current in amperes assuming 230 V
         if total_current_required < 6:
-            print(f"Requested power {power} W is too low. Minimum is {self.MINIMUM_ENERGY_CONSUMPTION} W (6 A). Turning charging off and setting minimum values.")
+            log.debug(f"Requested power {power} W is too low. Minimum is {self.MINIMUM_ENERGY_CONSUMPTION} W (6 A). Turning charging off and setting minimum values.")
             ret = self.set_charging_off()
             self.set_charging_power(self.MINIMUM_ENERGY_CONSUMPTION)
             return ret
@@ -302,10 +304,10 @@ class GoEService:
             # TODO set phases and current at the same time to avoid intermediate states with wrong power, but this requires further testing to make sure that the charger accepts multiple simultaneous setting changes and applies them correctly. For now we set the phases first and then the current with a short delay in between to make sure that the charger has applied the new number of phases before we update the current to avoid issues with unsupported current-phase combinations.
             
             ret = self._set_charging_phases(phases_required)
-            print(f">>> Set charging phases to {phases_required} for requested power {power} W, return value: {ret}")
+            log.debug(f"Set charging phases to {phases_required} for requested power {power} W, return value: {ret}")
             if ret:
                 ret = self._set_charging_current(current_required)
-                print(f">>> Set charging current to {current_required} A for requested power {power} W, return value: {ret}")
+                log.debug(f"Set charging current to {current_required} A for requested power {power} W, return value: {ret}")
                 if(ret):
                     self.set_charging_on()  # make sure charging is on after successfully updating the settings
                 return ret

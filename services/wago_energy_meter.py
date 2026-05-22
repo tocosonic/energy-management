@@ -1,6 +1,9 @@
+import logging
 from pymodbus.client import ModbusSerialClient
 import serial.tools.list_ports
 import struct
+
+log = logging.getLogger(__name__)
 
 class WagoEnergyMeter:
     def __init__(self, port, slave_id=1, baudrate=9600, timeout=3):
@@ -19,7 +22,7 @@ class WagoEnergyMeter:
         self.client.close()
         
         if result.isError():
-            print(f"Error reading from Wago energy meter: {result}")
+            log.error(f"Error reading from Wago energy meter: {result}")
             return 0.0
         # Decode IEEE-754 float32 with ABCD byte order (register 0: AB, register 1: CD).
         return self._decode_ieee754_float32_abcd(result.registers)
@@ -36,7 +39,7 @@ class WagoEnergyMeter:
         self.client.close()
         
         if result.isError():
-            print(f"Error reading from Wago energy meter: {result}")
+            log.error(f"Error reading from Wago energy meter: {result}")
             return 0.0
         # Decode IEEE-754 float32 with ABCD byte order (register 0: AB, register 1: CD).
         return self._decode_ieee754_float32_abcd(result.registers)

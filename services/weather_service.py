@@ -1,6 +1,8 @@
 from datetime import datetime
-
+import logging
 import requests
+
+log = logging.getLogger(__name__)
 
 class WeatherService:
     def __init__(self, api_key, latitude, longitude):
@@ -28,7 +30,7 @@ class WeatherService:
             self.sunrise_sunset[0] = sunrise
             self.sunrise_sunset[1] = sunset
         except Exception as e:
-            print(f"Error fetching sunrise and sunset times: {e}")
+            log.error(f"Error fetching sunrise and sunset times: {e}")
 
     def is_close_to_sunset(self, threshold_minutes=90):
         """Checks if the current time is within a specified number of minutes of sunset."""
@@ -39,7 +41,7 @@ class WeatherService:
             current_time = datetime.now()
             sunset_time = datetime.fromtimestamp(self.sunrise_sunset[1])
             time_diff = (sunset_time - current_time).total_seconds()
-            print(f"### Current time: {current_time}, Sunset time: {sunset_time}, Time difference in seconds: {time_diff}, Threshold in seconds: {threshold_seconds}")
+            log.debug(f"Current time: {current_time}, Sunset time: {sunset_time}, Time difference in seconds: {time_diff}, Threshold in seconds: {threshold_seconds}")
             return time_diff <= threshold_seconds
         else:
             return False
