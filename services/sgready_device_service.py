@@ -17,9 +17,9 @@ class SGReadyDeviceService:
         self.name = name
         self.energy_consumption = energy_consumption
         GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
         if self.relay_pin is not None:
             GPIO.setup(self.relay_pin, GPIO.OUT)
-        GPIO.setwarnings(False)
         self._init_db_entry()
 
     def _init_db_entry(self):

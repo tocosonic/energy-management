@@ -251,10 +251,10 @@ class EnergyManagementApplication:
         session_id = self.db_service.get_goe_action_session_id()
         if session_id is not None:
             self.create_car_charging_report_entry_end(session_id)
-            return self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED)
+            return self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, force=True)
         else:
             print(f"No active charging session found.")
-            return self.db_service.create_goe_action(ChargerAction.NO_ACTION)
+            return self.db_service.create_goe_action(ChargerAction.NO_ACTION, force=True)
         
     def create_car_charging_report_entry_start(self) -> int:
         """Create a new entry in the car charging report with the start time and the energy meter value at the start of the charging session.
