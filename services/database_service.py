@@ -27,6 +27,20 @@ class HeatpumpAction(Enum):
     HEATPUMP_ON = 3
     HEATPUMP_OFF = 4
 
+@dataclass(frozen=True)
+class HeatpumpStatus:
+    id: int
+    timestamp: datetime
+    device_name: str
+    action: HeatpumpAction
+
+@dataclass(frozen=True)
+class ChargerStatus:
+    action: ChargerAction
+    timestamp: datetime
+    session_id: int
+    user_id: int
+
 class DBService:
     def __init__(self, db_path, energy_status_retention_minutes: int = 60):
         self.db_path = db_path
@@ -274,6 +288,26 @@ class DBService:
         else:
             return None
 
+    def get_goe_status(self) -> ChargerStatus:
+        """Get the current GoE status, including action, timestamp, session ID, and user ID."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT action, timestamp, session_id, rfid_chip_id FROM goe_action LIMIT 1
+        ''')
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return ChargerStatus(
+                action=ChargerAction(result[0]),
+                timestamp=datetime.fromisoformat(result[1]),
+                session_id=result[2],
+                user_id=result[3]
+            )
+        else:
+            return None
+
     def is_goe_action(self, action: ChargerAction) -> bool:
         """Check if a specific GoE action is currently active."""
         current_action = self.get_goe_action()
@@ -335,6 +369,28 @@ class DBService:
 
         if result:
             return HeatpumpAction(result[0])
+        else:
+            return None
+
+    def get_heatpump_status_by_id(self, id: int) -> HeatpumpStatus:
+        """Get the current heatpump status for a given heatpump id."""
+        print(f"+++ Fetching heatpump status from database for heatpump with id {id}")
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute(f'''
+            SELECT device_name, action, timestamp FROM heatpump_action WHERE id = ? LIMIT 1
+        ''', (id,))
+        result = cursor.fetchone()
+        conn.close()
+
+        if result:
+            return HeatpumpStatus(
+                id=id,
+                device_name=result[0],
+                action=HeatpumpAction(result[1]),
+                timestamp=datetime.fromisoformat(result[2])
+            )
         else:
             return None
 
