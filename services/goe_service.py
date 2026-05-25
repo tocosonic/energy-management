@@ -102,6 +102,8 @@ class GoEService:
     def get_user_name(self, user_id: int) -> str:
         """Returns:
             The user name corresponding to the given card index of the user."""
+        if user_id is None:
+            return "None"
         filter = f"c{user_id}n"  # the filter for the user name of the given user ID. The API returns the user name for the last authenticated user with this filter, so it is important to provide the correct user ID to get the correct user name.
         user_name = self._get_status(filter)
         return user_name

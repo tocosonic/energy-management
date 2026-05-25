@@ -102,6 +102,8 @@ def main(bypass_run: bool = False, start_ui: bool = False):
         current_power = em.get_current_power_kw()
         print(f"Current power: {current_power} kW")
 
+        print(f"GOE_USE_PV_SURPLUS: {os.getenv('GOE_USE_PV_SURPLUS', 'false').lower() == 'true'}")
+        
         # # Initialize services
         # db_service = DBService(db_path=os.getenv("DATABASE_PATH"))
         # weather_service = WeatherService(api_key=os.getenv("OPENWEATHER_API_KEY"), latitude=os.getenv("OPENWEATHER_LAT"), longitude=os.getenv("OPENWEATHER_LON"))
@@ -109,19 +111,19 @@ def main(bypass_run: bool = False, start_ui: bool = False):
         # warm_water_heatpump_service = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heat Pump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
         # heating_heatpump_service1 = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_HEATING1")), "Panasonic Heating Heat Pump 1", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")))
         # heating_heatpump_service2 = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heat Pump 2", int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
-        goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
-        lm = LogicMode.Awattar
-        ret = goe_service._set_logic_mode(lm)
-        if not ret:
-            print("Failed to set logic mode")
-        else:
-            print("Successfully set logic mode to Awattar")
+        # goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
+        # lm = LogicMode.Awattar
+        # ret = goe_service._set_logic_mode(lm)
+        # if not ret:
+        #     print("Failed to set logic mode")
+        # else:
+        #     print("Successfully set logic mode to Awattar")
         
-        ret = goe_service.set_pv_surplus_available_power(2000)  # Set PV surplus available power to 2000 W for testing purposes
-        if not ret:
-            print("Failed to set PV surplus available power")
-        else:
-            print("Successfully set PV surplus available power to 2000 W")
+        # ret = goe_service.set_pv_surplus_available_power(2000)  # Set PV surplus available power to 2000 W for testing purposes
+        # if not ret:
+        #     print("Failed to set PV surplus available power")
+        # else:
+        #     print("Successfully set PV surplus available power to 2000 W")
             
         # relay_test = SGReadyDeviceService(db_service, 16, "Test Relay")
         # print(f"Initial status of relay on pin 16: {'ON' if relay_test.is_on() else 'OFF'}")

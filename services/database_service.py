@@ -21,6 +21,8 @@ class ChargerAction(Enum):
     MAX_CHARGING = 4
     REQUEST_STOP_CHARGING = 5
     CHARGING_STOPPED = 6
+    SURPLUS_CHARGING = 7
+    REQUEST_SURPLUS_CHARGING = 8
 
 class HeatpumpAction(Enum):
     NO_ACTION = 0
