@@ -74,6 +74,11 @@ class ChargerError(Enum):
     Reserved23=23
     Reserved24=24
 
+class LogicMode(Enum):
+    Default=3
+    EcoMode=4
+    AutomaticStop=5
+
 class GoEService:
     """Client for reading and updating charger state through the go-e API."""
 
@@ -110,6 +115,58 @@ class GoEService:
         """Returns:
             Whether the last authenticated user is the dynamic charging user."""
         return self.get_authenticated_user() == self.dynamic_charging_user
+
+    def get_logic_mode(self) -> LogicMode:
+        """Returns:
+            The current logic mode of the charger (Default=3, Awattar=4, AutomaticStop=5)."""
+        return LogicMode(self._get_status("lmo"))
+
+    def _set_logic_mode(self, logic_mode: LogicMode) -> bool:
+        """Set the logic mode of the charger.
+        Args:
+            logic_mode: The logic mode to set (Default=3, Awattar=4, AutomaticStop=5).
+        Returns:
+            True if the update succeeded, otherwise False.
+        """
+        return self._update_setting("lmo", logic_mode.value)
+
+    def _is_pv_surplus_enabled(self) -> bool:
+        """Returns:
+            Whether the charger is configured to charge from PV surplus."""
+        return self._get_status("fup")
+
+    def _set_pv_surplus_enabled(self, enabled: bool) -> bool:
+        """Enable or disable charging from PV surplus.
+        Args:
+            enabled: Whether to enable charging from PV surplus.
+        Returns:
+            True if the update succeeded, otherwise False.
+        """
+        return self._update_setting("fup", True if enabled else False)
+
+    def enable_pv_surplus_charging(self) -> bool:
+        """Enable charging from PV surplus. This is a convenience method that combines enabling PV surplus charging and setting the logic mode to Awattar, which is required for PV surplus charging to work."""
+        ret = self._set_logic_mode(LogicMode.Awattar)
+        if ret:
+            return self._set_pv_surplus_enabled(True)
+        return False
+
+    def disable_pv_surplus_charging(self) -> bool:
+        """Disable charging from PV surplus. This is a convenience method that combines disabling PV surplus charging and setting the logic mode to Default, which is required for PV surplus charging to work."""
+        ret = self._set_pv_surplus_enabled(False)
+        if ret:
+            return self._set_logic_mode(LogicMode.Default)
+        return False
+
+    def set_pv_surplus_available_power(self, power: int) -> bool:
+        """Set the available PV surplus power for charging in watts. This is only relevant if PV surplus charging is enabled.
+        Args:
+            power: The available PV surplus power in watts.
+        Returns:
+            True if the update succeeded, otherwise False.
+        """
+        ids = f"{{'pGrid': {-power}}}"  # the expected format for the available PV surplus power setting, which is a JSON object with a key "ids" and the value is the available power in watts (the API expects the available power to be negative!).
+        return self._update_setting("ids", ids)
 
     def get_car_status(self) -> CarStatus:
         """The current status code of the car reported by the charger.

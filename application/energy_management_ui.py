@@ -64,10 +64,20 @@ class EnergyManagementUI:
             ui.label(f"{power} kW").style("font-size: 16px; margin-top: 0px;")
 
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("PV surplus enabled").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            pv_enabled = goe_service._is_pv_surplus_enabled()
+            logic_mode = goe_service.get_logic_mode()
+            ui.label("Yes" if pv_enabled else "No").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Logic mode").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            logic_mode = goe_service.get_logic_mode()
+            ui.label(f"{logic_mode.name}").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Configured phases / current").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ph = goe_service.get_phases()
             phases = "autom." if ph == 0 else str(ph)
-            # phases = ""
             current = goe_service.get_charging_current()
             ui.label(f"{phases} / {current} A").style("font-size: 16px; margin-top: 0px;")
 
