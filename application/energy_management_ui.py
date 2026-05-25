@@ -34,7 +34,7 @@ class EnergyManagementUI:
         sonnen_battery_service.refresh_status()  # Refresh the status to get the latest data
 
         ui.add_head_html('<link rel="apple-touch-icon" href="static/apple-touch-icon.png">')        
-        with ui.grid(columns="10px 100px auto").style("padding: 10px;"):
+        with ui.grid(columns="10px 150px auto").style("padding: 10px;"):
             # Car Charging
             ui.label("Car Charging").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
             
@@ -44,24 +44,47 @@ class EnergyManagementUI:
             ui.label(f"{user_name} (ID: {user_id})").style("font-size: 16px; margin-top: 0px;")
             
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Service status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             charging_status = db_service.get_goe_status()
             ui.label(f"{charging_status.action.name} (since {charging_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Charger status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            charger_status = goe_service.get_charger_status()
+            ui.label(f"{charger_status.name}").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Car status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            car_status = goe_service.get_car_status()
+            ui.label(f"{car_status.name}").style("font-size: 16px; margin-top: 0px;")
             
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Power").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             power = energy_meter.get_current_power_kw()
             ui.label(f"{power} kW").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Configured phases / current").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ph = goe_service.get_phases()
+            phases = "autom." if ph == 0 else str(ph)
+            # phases = ""
+            current = goe_service.get_charging_current()
+            ui.label(f"{phases} / {current} A").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Charger error").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            charger_error = goe_service.get_error()
+            ui.label(f"{charger_error.name}").style("font-size: 16px; margin-top: 0px;")
             
             # Sonnen Battery
             ui.label("Sonnen Battery").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("Battery Level").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Battery level").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             battery_level = sonnen_battery_service.get_battery_level()
             ui.label(f"{battery_level} %").style("font-size: 16px; margin-top: 0px;")
             
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("Discharging Allowed").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Discharging allowed").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             discharging_allowed = not sonnen_battery_service.is_discharge_disabled()
             ui.label("Yes" if discharging_allowed else "No").style("font-size: 16px; margin-top: 0px;")
         

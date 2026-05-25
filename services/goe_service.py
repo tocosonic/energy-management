@@ -14,6 +14,66 @@ class CarStatus(Enum):
     COMPLETE = 4
     ERROR = 5
 
+class ChargerStatus(Enum):
+    NotChargingBecauseNoChargeCtrlData=0
+    NotChargingBecauseOvertemperature=1
+    NotChargingBecauseAccessControlWait=2
+    ChargingBecauseForceStateOn=3
+    NotChargingBecauseForceStateOff=4
+    NotChargingBecauseScheduler=5
+    NotChargingBecauseEnergyLimit=6
+    ChargingBecauseAwattarPriceLow=7
+    ChargingBecauseAutomaticStopTestLadung=8
+    ChargingBecauseAutomaticStopNotEnoughTime=9
+    ChargingBecauseAutomaticStop=10
+    ChargingBecauseAutomaticStopNoClock=11
+    ChargingBecausePvSurplus=12
+    ChargingBecauseFallbackGoEDefault=13
+    ChargingBecauseFallbackGoEScheduler=14
+    ChargingBecauseFallbackDefault=15
+    NotChargingBecauseFallbackGoEAwattar=16
+    NotChargingBecauseFallbackAwattar=17
+    NotChargingBecauseFallbackAutomaticStop=18
+    ChargingBecauseCarCompatibilityKeepAlive=19
+    ChargingBecauseChargePauseNotAllowed=20
+    NotChargingBecauseSimulateUnplugging=22
+    NotChargingBecausePhaseSwitch=23
+    NotChargingBecauseMinPauseDuration=24
+    NotChargingBecauseError=26
+    NotChargingBecauseLoadManagementDoesntWant=27
+    NotChargingBecauseOcppDoesntWant=28
+    NotChargingBecauseReconnectDelay=29
+    NotChargingBecauseAdapterBlocking=30
+    NotChargingBecauseUnderfrequencyControl=31
+    NotChargingBecauseUnbalancedLoad=32
+    ChargingBecauseDischargingPvBattery=33
+    NotChargingBecauseGridMonitoring=34
+    NotChargingBecauseOcppFallback=35
+
+class ChargerError(Enum):
+    NoError=0
+    FiAc=1
+    FiDc=2
+    Phase=3
+    Overvolt=4
+    Overamp=5
+    Diode=6
+    PpInvalid=7
+    GndInvalid=8
+    ContactorStuck=9
+    ContactorMiss=10
+    FiUnknown=11
+    Unknown=12
+    Overtemp=13
+    NoComm=14
+    StatusLockStuckOpen=15
+    StatusLockStuckLocked=16
+    Reserved20=20
+    Reserved21=21
+    Reserved22=22
+    Reserved23=23
+    Reserved24=24
+
 class GoEService:
     """Client for reading and updating charger state through the go-e API."""
 
@@ -75,7 +135,7 @@ class GoEService:
         """Return whether charging is currently allowed by the charger."""
         return self._get_status("alw")
 
-    def get_error(self) -> int:
+    def get_error(self) -> ChargerError:
         """The error code reported by the charger.
         Returns:
             None on internal errors.
@@ -86,9 +146,34 @@ class GoEService:
             StatusLockStuckLocked=16, Reserved20=20, Reserved21=21,
             Reserved22=22, Reserved23=23, Reserved24=24.
         """
-        return self._get_status("err")
+        err = self._get_status("err")
+        return ChargerError(err) if err is not None else "Internal Error"
 
-    def _get_phases(self) -> int:
+    def get_charger_status(self) -> ChargerStatus:
+        """The charger status code reported by the charger.
+        Returns:
+            None on internal errors.
+            Values include: NotChargingBecauseNoChargeCtrlData=0,
+            NotChargingBecauseOvertemperature=1, NotChargingBecauseAccessControlWait=2,
+            ChargingBecauseForceStateOn=3, NotChargingBecauseForceStateOff=4,
+            NotChargingBecauseScheduler=5, NotChargingBecauseEnergyLimit=6,
+            ChargingBecauseAwattarPriceLow=7, ChargingBecauseAutomaticStopTestLadung=8,
+            ChargingBecauseAutomaticStopNotEnoughTime=9, ChargingBecauseAutomaticStop=10,
+            ChargingBecauseAutomaticStopNoClock=11, ChargingBecausePvSurplus=12,
+            ChargingBecauseFallbackGoEDefault=13, ChargingBecauseFallbackGoEScheduler=14,
+            NotChargingBecausePhaseSwitch=23, NotChargingBecauseMinPauseDuration=24,
+            NotChargingBecauseError=26, NotChargingBecauseLoadManagementDoesntWant=27,
+            NotChargingBecauseOcppDoesntWant=28, NotChargingBecauseReconnectDelay=29,
+            NotChargingBecauseAdapterBlocking=30, NotChargingBecauseUnderfrequencyControl=31,
+            NotChargingBecauseUnbalancedLoad=32, ChargingBecauseDischargingPvBattery=33,
+            NotChargingBecauseGridMonitoring=34, NotChargingBecauseOcppFallback=35.
+        """
+        status = self._get_status("modelStatus")
+        if status is None:
+            return None
+        return ChargerStatus(status)
+
+    def get_phases(self) -> int:
         """The configured number of charging phases.
         Returns:
             0 for automatic phase switching,
@@ -120,7 +205,7 @@ class GoEService:
         Returns:
             The currently configured charging power in watts, or None on internal errors.
         """
-        phases = self._get_phases()
+        phases = self.get_phases()
         if phases == -1:
             return None
         elif phases == 0:
@@ -228,7 +313,7 @@ class GoEService:
         """
         log.debug(f"Setting charging phases to {phases}")
         
-        current_phases = self._get_phases()
+        current_phases = self.get_phases()
         is_car_charging = self.is_car_charging()
         charging_stopped = False
         ret = False
