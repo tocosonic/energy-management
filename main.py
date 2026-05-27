@@ -28,7 +28,7 @@ with open("logging.yaml", "r") as f:
 log = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-def main(bypass_run: bool = False, start_ui: bool = False):
+def main(bypass_run: bool = False, start_ui: bool = False, pv_surplus: bool = False):
     """
     Main function to initialize the energy management application and run it.
     Installation as service:
@@ -75,6 +75,10 @@ def main(bypass_run: bool = False, start_ui: bool = False):
         log.info("Starting UI instance")
         appUI = EnergyManagementUI()
         appUI.run()
+    elif pv_surplus:
+        log.info("Starting PV surplus data feed")
+        app = EnergyManagementApplication()
+        app.run_update_pv_surplus()
     elif not bypass_run:
         log.info("Starting EnergyManagementApplication")
         app = EnergyManagementApplication()
@@ -192,5 +196,10 @@ if __name__ in {"__main__", "__mp_main__"}:
         action="store_true",
         help="Start the user interface (not implemented yet)",
     )
+    parser.add_argument(
+        "--pv-surplus",
+        action="store_true",
+        help="Start sending regular PV surplus data to the charger",
+    )
     args = parser.parse_args()
-    main(bypass_run=args.bypass_run, start_ui=args.ui)
+    main(bypass_run=args.bypass_run, start_ui=args.ui, pv_surplus=args.pv_surplus)

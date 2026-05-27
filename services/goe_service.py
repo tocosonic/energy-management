@@ -144,11 +144,11 @@ class GoEService:
         Returns:
             True if the update succeeded, otherwise False.
         """
-        return self._update_setting("fup", True if enabled else False)
+        return self._update_setting("fup", "true" if enabled else "false")
 
     def enable_pv_surplus_charging(self) -> bool:
         """Enable charging from PV surplus. This is a convenience method that combines enabling PV surplus charging and setting the logic mode to Awattar, which is required for PV surplus charging to work."""
-        ret = self._set_logic_mode(LogicMode.Awattar)
+        ret = self._set_logic_mode(LogicMode.EcoMode)
         if ret:
             return self._set_pv_surplus_enabled(True)
         return False
@@ -400,6 +400,8 @@ class GoEService:
                     self.set_charging_on()
                 else:
                     self.set_charging_default()
+        else:
+            ret = True  # no update needed, but we consider this a successful update
         return ret
 
     def _set_charging_current(self, current) -> bool:

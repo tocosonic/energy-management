@@ -65,17 +65,25 @@ class EnergyManagementApplication:
             self.update_heatpump(self.heating_heatpump_service, self.control_structure.START_HEATING_WAIT_TIME, self.control_structure.STOP_HEATING_WAIT_TIME)
             self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)
 
-            if self.control_structure.GOE_USE_PV_SURPLUS:
-                # we have to speed-up the car charging update in case we are using the PV surplus available power from the GoE API to determine if there is enough excess energy available to turn on the car charging, because the PV surplus available power can change rapidly due to fluctuations in energy production and consumption, so we want to make sure that we react to these changes as quickly as possible to avoid turning on the car charging when there is not actually enough excess energy available or to avoid turning off the car charging when there is still enough excess energy available.
-                for _ in range(int(sleep_time / pv_surplus_sleep_time)):
-                    log.info("Request update car-charging (PV Surplus)")
-                    self.update_car_charging()
-                    sleep(pv_surplus_sleep_time)
-            else:
-                log.info("Request update car-charging (dynamic)")
-                self.update_car_charging()
-
+            # if self.control_structure.GOE_USE_PV_SURPLUS:
+            #     # we have to speed-up the car charging update in case we are using the PV surplus available power from the GoE API to determine if there is enough excess energy available to turn on the car charging, because the PV surplus available power can change rapidly due to fluctuations in energy production and consumption, so we want to make sure that we react to these changes as quickly as possible to avoid turning on the car charging when there is not actually enough excess energy available or to avoid turning off the car charging when there is still enough excess energy available.
+            #     for _ in range(int(sleep_time / pv_surplus_sleep_time)):
+            #         log.info("Request update car-charging (PV Surplus)")
+            #         self.update_car_charging()
+            #         sleep(pv_surplus_sleep_time)
+            # else:
+            log.info("Request update car-charging (dynamic)")
+            self.update_car_charging()
             sleep(sleep_time)  # Sleep for 60 seconds before checking again
+
+    def run_update_pv_surplus(self):
+        pv_surplus_sleep_time: int = 5
+        if self.control_structure.GOE_USE_PV_SURPLUS:
+            log.info("Request update car-charging (PV Surplus)")
+            while True:
+                # we have to speed-up the car charging update in case we are using the PV surplus available power from the GoE API to determine if there is enough excess energy available to turn on the car charging, because the PV surplus available power can change rapidly due to fluctuations in energy production and consumption, so we want to make sure that we react to these changes as quickly as possible to avoid turning on the car charging when there is not actually enough excess energy available or to avoid turning off the car charging when there is still enough excess energy available.
+                self.update_pv_surplus()
+                sleep(pv_surplus_sleep_time)
     
     ######################
     # Heatpump Section
@@ -137,6 +145,15 @@ class EnergyManagementApplication:
     # Car Charging Section
     ######################
             
+    def update_pv_surplus(self):
+        min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
+        available_power = min_power # if min_power > 0 else 0
+        
+        if self.goe_service.set_pv_surplus_available_power(available_power):
+            log.info(f"PV surplus available power set to {available_power} W")
+        else:
+            log.warning(f"Failed to set PV surplus available power to {available_power} W, will retry in {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes.")
+            
     def check_and_process_user_change(self, current_action_user: int, authenticated_user: int):
         """
         Check if there was a change in the authenticated user for the GoE API and process it accordingly. This is relevant for
@@ -161,33 +178,33 @@ class EnergyManagementApplication:
         current_user = self.goe_service.get_authenticated_user()
         self.check_and_process_user_change(self.db_service.get_goe_action_user_id(), current_user)
 
-        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete():
+        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.NotChargingBecauseFallbackAwattar]:
             log.debug(f"Car charging is currently allowed or the car is charging or charging was completed.")
         
             if self.goe_service.is_car_charging_complete():
                 log.debug(f"Car charging was completed.")
                 return self.process_charging_finished()
 
-            elif self.goe_service.is_dynamic_charging_user() and self.control_structure.GOE_USE_PV_SURPLUS:
-                log.debug(f"The last authenticated user is the dynamic charging user. PV surplus usage is enabled.")
-                min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
-                available_power = min_power
-                if self.db_service.is_goe_action(ChargerAction.SURPLUS_CHARGING):
-                    log.debug(f"Surplus charging is already active, no need to request to start surplus charging again.")
-                    self.goe_service.set_pv_surplus_available_power(available_power)
-                    return ChargerAction.SURPLUS_CHARGING
-                else:
-                    # activate surplus charging
-                    self.goe_service._set_charging_phases(0) # Set charging phases to automatic to allow the GoE API to adjust the charging power based on the available excess energy. This is necessary for the PV surplus charging to work properly, because the GoE API will only adjust the charging power based on the available excess energy if the charging phases are set to automatic.
-                    self.goe_service.enable_pv_surplus_charging()
-                    if self.goe_service.set_pv_surplus_available_power(available_power):
-                        log.info(f"PV surplus available power set to {available_power} W")
-                        # create new charging session
-                        session_id = self.create_car_charging_report_entry_start()
-                        return self.db_service.create_goe_action(ChargerAction.SURPLUS_CHARGING, session_id, current_user)
-                    else:
-                        log.warning(f"Failed to set PV surplus available power to {available_power} W, will retry in {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes.")
-                        return self.db_service.create_goe_action(ChargerAction.REQUEST_SURPLUS_CHARGING, current_user)
+            # elif self.goe_service.is_dynamic_charging_user() and self.control_structure.GOE_USE_PV_SURPLUS:
+            #     log.debug(f"The last authenticated user is the dynamic charging user. PV surplus usage is enabled.")
+            #     min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
+            #     available_power = min_power
+            #     if self.db_service.is_goe_action(ChargerAction.SURPLUS_CHARGING):
+            #         log.debug(f"Surplus charging is already active, no need to request to start surplus charging again.")
+            #         self.goe_service.set_pv_surplus_available_power(available_power)
+            #         return ChargerAction.SURPLUS_CHARGING
+            #     else:
+            #         # activate surplus charging
+            #         self.goe_service._set_charging_phases(0) # Set charging phases to automatic to allow the GoE API to adjust the charging power based on the available excess energy. This is necessary for the PV surplus charging to work properly, because the GoE API will only adjust the charging power based on the available excess energy if the charging phases are set to automatic.
+            #         self.goe_service.enable_pv_surplus_charging()
+            #         if self.goe_service.set_pv_surplus_available_power(available_power):
+            #             log.info(f"PV surplus available power set to {available_power} W")
+            #             # create new charging session
+            #             session_id = self.create_car_charging_report_entry_start()
+            #             return self.db_service.create_goe_action(ChargerAction.SURPLUS_CHARGING, session_id, current_user)
+            #         else:
+            #             log.warning(f"Failed to set PV surplus available power to {available_power} W, will retry in {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes.")
+            #             return self.db_service.create_goe_action(ChargerAction.REQUEST_SURPLUS_CHARGING, current_user)
                 
             elif self.goe_service.is_dynamic_charging_user() and not self.control_structure.GOE_USE_PV_SURPLUS:
                 log.debug(f"The last authenticated user is the dynamic charging user. PV surplus usage is disabled.")
@@ -200,7 +217,6 @@ class EnergyManagementApplication:
                 if available_power >= self.goe_service.MINIMUM_ENERGY_CONSUMPTION:
                     if self.db_service.is_goe_action(ChargerAction.DYNAMIC_CHARGING):
                         log.debug(f"Dynamic charging is already active, no need to request to start dynamic charging again.")
-                        # TODO optionally: wait some time before changing the charging power
                         self.goe_service.set_charging_power(available_power)
                         return ChargerAction.DYNAMIC_CHARGING
                     else:
@@ -210,7 +226,7 @@ class EnergyManagementApplication:
                             session_id = self.create_car_charging_report_entry_start()
                             return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
                         else:
-                            log.warning(f"Failed to set car charging power to {available_power} W, will retry in {self.control_structure.START_CAR_CHARGING_WAIT_TIME} minutes.")
+                            log.warning(f"Failed to set car charging power to {available_power} W, will keep retrying.")
                             return self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING, current_user)
                 else:
                     log.debug(f"Not enough excess energy available to turn on car charging. Available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
