@@ -178,7 +178,7 @@ class EnergyManagementApplication:
         current_user = self.goe_service.get_authenticated_user()
         self.check_and_process_user_change(self.db_service.get_goe_action_user_id(), current_user)
 
-        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.NotChargingBecauseFallbackAwattar]:
+        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING]:
             log.debug(f"Car charging is currently allowed or the car is charging or charging was completed.")
         
             if self.goe_service.is_car_charging_complete():
