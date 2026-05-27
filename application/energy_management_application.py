@@ -56,7 +56,6 @@ class EnergyManagementApplication:
 
     def run(self):
         sleep_time: int = 60
-        pv_surplus_sleep_time: int = 5
         """Main loop of the energy management application. This will continuously monitor the energy status, weather conditions, and Sonnen battery status, and control the devices accordingly."""
         while True:
             # Refresh the status of the Sonnen battery
@@ -65,14 +64,6 @@ class EnergyManagementApplication:
             self.update_heatpump(self.heating_heatpump_service, self.control_structure.START_HEATING_WAIT_TIME, self.control_structure.STOP_HEATING_WAIT_TIME)
             self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)
 
-            # if self.control_structure.GOE_USE_PV_SURPLUS:
-            #     # we have to speed-up the car charging update in case we are using the PV surplus available power from the GoE API to determine if there is enough excess energy available to turn on the car charging, because the PV surplus available power can change rapidly due to fluctuations in energy production and consumption, so we want to make sure that we react to these changes as quickly as possible to avoid turning on the car charging when there is not actually enough excess energy available or to avoid turning off the car charging when there is still enough excess energy available.
-            #     for _ in range(int(sleep_time / pv_surplus_sleep_time)):
-            #         log.info("Request update car-charging (PV Surplus)")
-            #         self.update_car_charging()
-            #         sleep(pv_surplus_sleep_time)
-            # else:
-            log.info("Request update car-charging (dynamic)")
             self.update_car_charging()
             sleep(sleep_time)  # Sleep for 60 seconds before checking again
     
