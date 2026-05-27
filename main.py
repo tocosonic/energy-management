@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 def main(bypass_run: bool = False, start_ui: bool = False):
     """
     Main function to initialize the energy management application and run it.
-    Installation as service:
+    # Installation as Service:
     1. Create a systemd service file at `/etc/systemd/system/energy-management.service` with the following content:
     
         [Unit]
@@ -69,6 +69,37 @@ def main(bypass_run: bool = False, start_ui: bool = False):
     
         sudo journalctl -u energy-management.service -f
     
+    # Configuration of the Service
+    You need a `.env` file to configure the service. Create a `.env` file in the same directory as your main.py with the following content:
+    
+        RELAY_PIN_WW=5
+        RELAY_PIN_HEATING1=6
+        RELAY_PIN_HEATING2=13
+        OPENWEATHER_API_KEY=<your_openweather_api_key>
+        OPENWEATHER_LAT=<your_openweather_latitude>
+        OPENWEATHER_LON=<your_openweather_longitude>
+        SONNEN_BATTERY_HOST=<your_sonnen_battery_host>
+        SONNEN_BATTERY_PORT=8080
+        SONNEN_BATTERY_API_KEY=<your_sonnen_battery_api_key>
+        GOE_HOST=<your_goe_host>
+        GOE_API_KEY=<your_goe_api_key>
+        GOE_FIXED_CHARGING_USER=1
+        GOE_DYNAMIC_CHARGING_USER=0
+        DATABASE_PATH=/home/<your_user>/projects/energy-management/em.db
+        WW_ENERGY_CONSUMPTION=700
+        HEATING1_ENERGY_CONSUMPTION=500
+        HEATING2_ENERGY_CONSUMPTION=200
+        START_WW_WAIT_TIME=5
+        START_HEATING_WAIT_TIME=5
+        START_CAR_CHARGING_WAIT_TIME=7
+        STOP_WW_WAIT_TIME=15
+        STOP_HEATING_WAIT_TIME=10
+        STOP_CAR_CHARGING_WAIT_TIME=15
+        NON_USED_ENERGY_BUFFER=-300
+        ENERGY_METER_SLAVE_ID=1
+        ENERGY_METER_PORT=/dev/ttyACM0
+        ENERGY_METER_BAUDRATE=9600
+
     """
     
     if start_ui:
