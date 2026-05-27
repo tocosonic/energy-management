@@ -210,10 +210,17 @@ class EnergyManagementApplication:
                 log.debug(f"The last authenticated user is the dynamic charging user. PV surplus usage is disabled.")
                 
                 # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
-                min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(self.control_structure.START_CAR_CHARGING_WAIT_TIME)
+                min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(2) # self.control_structure.START_CAR_CHARGING_WAIT_TIME
                 consumed_power = self.goe_service.get_current_charging_power()
-                available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power
-                log.debug(f"Minimum grid feed-in: {min_power} W, available power for car charging after buffer: {available_power} W, current car charging power: {self.goe_service.get_configured_charging_power()} W")
+                battery_feed_in = self.sonnen_battery_service.get_battery_feed()
+                battery_discharge = -battery_feed_in if battery_feed_in < 0 else 0
+                
+                if battery_discharge > 0:
+                    # allow 250 W discharging energy
+                    battery_discharge = battery_discharge - 250
+                
+                available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power - battery_discharge
+                log.debug(f"Minimum grid feed-in: {min_power} W, current car charging power: {consumed_power} W, buffer power: {self.control_structure.NON_USED_ENERGY_BUFFER} W, battery discharge: {battery_discharge} W, available power for car charging after buffer: {available_power} W")
                 if available_power >= self.goe_service.MINIMUM_ENERGY_CONSUMPTION:
                     if self.db_service.is_goe_action(ChargerAction.DYNAMIC_CHARGING):
                         log.debug(f"Dynamic charging is already active, no need to request to start dynamic charging again.")
@@ -223,8 +230,14 @@ class EnergyManagementApplication:
                         if self.goe_service.set_charging_power(available_power):
                             log.info(f"Car charging power set to {available_power} W")
                             # create new charging session
-                            session_id = self.create_car_charging_report_entry_start()
-                            return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
+                            if self.db_service.is_goe_action(ChargerAction.REQUEST_STOP_CHARGING):
+                                log.debug(f"Charging session for dynamic charging already exists, no need to create a new one. Setting back to dynamic charging action with the existing session ID.")
+                                session_id = self.db_service.get_goe_action_session_id_by_charger_action(ChargerAction.REQUEST_STOP_CHARGING)
+                                return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
+                            else:
+                                session_id = self.create_car_charging_report_entry_start()
+                                log.debug(f"Created new charging session with ID {session_id} for dynamic charging.")
+                                return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
                         else:
                             log.warning(f"Failed to set car charging power to {available_power} W, will keep retrying.")
                             return self.db_service.create_goe_action(ChargerAction.REQUEST_DYNAMIC_CHARGING, current_user)

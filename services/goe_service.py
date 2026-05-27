@@ -353,7 +353,7 @@ class GoEService:
 
     def set_charging_on(self) -> bool:
         """Force charging on."""
-        ret = False
+        ret = True
         if not self.is_car_charging():
             ret = self._update_setting("frc", 2)
             time.sleep(self._get_sleep_time())  # wait for the charger to start charging before returning to avoid issues with subsequent updates
@@ -409,7 +409,7 @@ class GoEService:
         Args:
             current: Charging current in the allowed range from 6 to 16 A.
         Returns:
-            True if the update was applied and succeeded, otherwise False.
+            True if the update was applied and succeeded or was not necessary, otherwise False.
         """
         log.debug(f"Setting charging current to {current}")
         
@@ -418,7 +418,8 @@ class GoEService:
             return False
         elif self.get_charging_current() != current:
             return self._update_setting("amp", current)
-        return False
+        else:
+            return True
 
     def set_max_charging_power(self) -> bool:
         """Set the charger to maximum power using 3 phases and 16 A per phase."""

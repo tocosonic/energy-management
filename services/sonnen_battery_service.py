@@ -70,6 +70,7 @@ class SonnenBatteryService:
         return self.sonnen_status["GridFeedIn_W"] if self.sonnen_status else None
     
     def get_battery_feed(self) -> int:
+        """Power feed-in to the battery (charging). Negative value = discharging the battery."""
         return -self.sonnen_status["Pac_total_W"] if self.sonnen_status else None
     
     def get_battery_level(self) -> int:
