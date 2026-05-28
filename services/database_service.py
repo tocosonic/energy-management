@@ -130,11 +130,26 @@ class DBService:
     def create_car_charging_entry(self, charger_sn: str, charger_name: str, rfid_chip_id: int, rfid_chip_name: str, energy_meter_start: int) -> int:
         """Create a new car charging entry in the database when a charging session starts. Returns the session ID of the created entry."""
         conn = sqlite3.connect(self.db_path)
+        # Check if there is already an open charging report entry. Re-use this session and don't create a new one.
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id FROM car_charging_report WHERE end_time IS NULL AND charger_sn = ?
+        ''', (charger_sn,))
+        # we have to get the last open entry for this charger, because there could be multiple open entries. In this case we want to continue the most recent session and not create a new one.
+        result = cursor.fetchall()
+        if result and len(result) > 0:
+            session_id = result[-1][0]
+            # same user?
+            if result[-1][3] == rfid_chip_id:
+                log.debug(f"Found an open charging session with ID {session_id} for charger {charger_sn} and user with rfid_chip_id {rfid_chip_id}. Re-using this session for dynamic charging.")
+                conn.close()
+                return session_id
+            else:
+                log.warning(f"Found an open charging session with ID {session_id} for charger {charger_sn}, but it belongs to a different user (rfid_chip_id {result[-1][3]}) than the current user (rfid_chip_id {rfid_chip_id}). Will close the old session and create a new charging session for the current user.")
+                self.end_car_charging_entry(session_id, energy_meter_start)
+
         start_time = datetime.now()
         log.debug(f"Creating car charging entry in database with charger s/n {charger_sn}, charger_name {charger_name}, rfid_chip_id {rfid_chip_id}, rfid_chip_name {rfid_chip_name}, start_time {start_time}, energy_meter_start {energy_meter_start} Wh")
-        # TODO update to close a non-closed previous entry for the same charger
-
-
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO car_charging_report (charger_sn, charger_name, rfid_chip_id, rfid_chip_name, start_time, energy_meter_start)

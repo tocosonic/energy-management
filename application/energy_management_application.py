@@ -186,6 +186,7 @@ class EnergyManagementApplication:
                                 session_id = self.db_service.get_goe_action_session_id_by_charger_action(ChargerAction.REQUEST_STOP_CHARGING)
                                 return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
                             else:
+                                log.warning(f"Creating new charging session for dynamic charging, because no previous session exists. Current action = {self.db_service.get_goe_action().name}. This should only happen once when the first time the dynamic charging is turned on.")
                                 session_id = self.create_car_charging_report_entry_start()
                                 log.debug(f"Created new charging session with ID {session_id} for dynamic charging.")
                                 return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
@@ -228,7 +229,7 @@ class EnergyManagementApplication:
                 log.debug(f"The last authenticated user is the fixed charging user.")
                 # If the last authenticated user is the fixed charging user, we will turn on the car charging with max. power and disable discharging of the battery.
                 # TODO check the size of tpa (1/120 of the loaded energy?)
-                if self.goe_service.get_total_power_average() > 5:
+                if self.goe_service.get_total_power_average() > 250:
                     # Only turn off the battery if the charger is actually charging with a significant amount of power. 
                     log.info(f"Car is charging with significant power ({self.goe_service.get_total_power_average()} W), turning off battery discharge to prioritize car charging.")
                     self.sonnen_battery_service.set_disable_discharge()
