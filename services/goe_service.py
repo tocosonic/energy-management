@@ -285,9 +285,9 @@ class GoEService:
         return 0
 
     def get_total_power_average(self) -> int:
-        """The 30 seconds total average power in Wh as reported by the charger.
+        """The 30 seconds total average power in W as reported by the charger.
         Returns:
-            The 30 seconds total average power in Wh
+            The 30 seconds total average power in W
         """
         tpa = self._get_status("tpa")
         # API values can arrive as numeric strings (e.g. "1234.0") or numbers.
