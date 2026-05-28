@@ -159,9 +159,11 @@ class EnergyManagementApplication:
                 return self.process_charging_finished()
             elif self.goe_service.is_dynamic_charging_user() and not self.control_structure.GOE_USE_PV_SURPLUS:
                 log.debug(f"The last authenticated user is the dynamic charging user. PV surplus usage is disabled.")
+                self.sonnen_battery_service.set_enable_discharge()
                 
                 # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
                 min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(2) # self.control_structure.START_CAR_CHARGING_WAIT_TIME
+                # min_power = self.sonnen_battery_service.get_grid_feed_in_average(5)
                 consumed_power = self.goe_service.get_current_charging_power()
                 battery_feed_in = self.sonnen_battery_service.get_battery_feed()
                 battery_discharge = -battery_feed_in if battery_feed_in < 0 else 0
@@ -228,7 +230,6 @@ class EnergyManagementApplication:
             else:
                 log.debug(f"The last authenticated user is the fixed charging user.")
                 # If the last authenticated user is the fixed charging user, we will turn on the car charging with max. power and disable discharging of the battery.
-                # TODO check the size of tpa (1/120 of the loaded energy?)
                 if self.goe_service.get_total_power_average() > 250:
                     # Only turn off the battery if the charger is actually charging with a significant amount of power. 
                     log.info(f"Car is charging with significant power ({self.goe_service.get_total_power_average()} W), turning off battery discharge to prioritize car charging.")

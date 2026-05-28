@@ -56,6 +56,11 @@ class SonnenBatteryService:
         time_series = self.get_energy_status_time_series(minutes)
         return min(entry.feed_in for entry in time_series)
 
+    def get_grid_feed_in_average(self, minutes: int) -> int:
+        """Get the average grid feed-in value for the last specified number of minutes."""
+        time_series = self.get_energy_status_time_series(minutes)
+        return sum(entry.feed_in for entry in time_series) / len(time_series) if time_series else 0
+
     # Status of the Sonnen battery as JSON structure. This includes the current battery level, energy production, and energy consumption.
     def get_battery_status(self) -> json:
         return self.sonnen_status
@@ -92,7 +97,9 @@ class SonnenBatteryService:
     
     def is_discharge_disabled(self) -> bool:
         """Check if discharging of the battery is currently disabled."""
-        return self.sonnen_status["OperatingMode"] == 1
+        ret = self.sonnen_status["OperatingMode"] == "1"
+        log.debug(f"Battery discharge is currently {'disabled' if ret else 'enabled'} (OperatingMode: {self.sonnen_status['OperatingMode']})")
+        return ret
     
     def _set_discharge_off(self, disable: bool):
         try:
@@ -103,9 +110,11 @@ class SonnenBatteryService:
             }
             if disable:
                 # turn discharge off by setting the operating mode to 1
+                log.info("Disabling battery discharge to prioritize car charging.")
                 data = {"EM_OperatingMode": 1}
             else:
                 # turn discharge on by setting the operating mode to 2 (normal mode)
+                log.info("Enabling battery discharge to allow using battery energy for home consumption.")
                 data = {"EM_OperatingMode": 2}
             
             response = requests.put(url, headers=headers, json=data)
