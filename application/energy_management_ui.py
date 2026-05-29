@@ -31,7 +31,8 @@ class EnergyManagementUI:
         
     @ui.page("/")
     def main_page():
-        sonnen_battery_service.refresh_status()  # Refresh the status to get the latest data
+        # do not refresh - but rely on the updates of the main loop of the application.
+        # sonnen_battery_service.refresh_status()  # Refresh the status to get the latest data
 
         ui.add_head_html('<link rel="apple-touch-icon" href="static/apple-touch-icon.png">')        
         with ui.grid(columns="10px 150px auto").style("padding: 10px;"):

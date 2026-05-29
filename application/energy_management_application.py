@@ -59,7 +59,8 @@ class EnergyManagementApplication:
         """Main loop of the energy management application. This will continuously monitor the energy status, weather conditions, and Sonnen battery status, and control the devices accordingly."""
         while True:
             # Refresh the status of the Sonnen battery
-            self.sonnen_battery_service.refresh_status()
+            car_charging = self.energy_meter.get_current_power_w()
+            self.sonnen_battery_service.refresh_status(car_charging=car_charging)
 
             self.update_heatpump(self.heating_heatpump_service, self.control_structure.START_HEATING_WAIT_TIME, self.control_structure.STOP_HEATING_WAIT_TIME)
             self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)

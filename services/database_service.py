@@ -12,6 +12,8 @@ class EnergyStatus:
     production: int
     consumption: int
     feed_in: int
+    battery_feed_in: int
+    car_charging: int
 
 class ChargerAction(Enum):
     NO_ACTION = 0
@@ -70,7 +72,9 @@ class DBService:
                 timestamp DATETIME NOT NULL,
                 production INTEGER NOT NULL,
                 consumption INTEGER NOT NULL,
-                feed_in INTEGER NOT NULL
+                feed_in INTEGER NOT NULL,
+                battery_feed_in INTEGER NOT NULL,
+                car_charging INTEGER
             )
         ''')
         conn.commit()
@@ -459,15 +463,15 @@ class DBService:
         else:
             return None
 
-    def create_energy_status(self, production: int, consumption: int, feed_in: int):
+    def create_energy_status(self, production: int, consumption: int, feed_in: int, battery_feed_in: int, car_charging: int = None):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         timestamp = datetime.now()
-        log.debug(f"Creating energy status entry in database with timestamp {timestamp}, production {production} W, consumption {consumption} W, feed_in {feed_in} W")
+        log.debug(f"Creating energy status entry in database with timestamp {timestamp}, production {production} W, consumption {consumption} W, feed_in {feed_in} W, battery_feed_in {battery_feed_in} W, car_charging {car_charging} W")
         cursor.execute('''
-            INSERT INTO energy_status (timestamp, production, consumption, feed_in)
-            VALUES (?, ?, ?, ?)
-        ''', (timestamp, production, consumption, feed_in))
+            INSERT INTO energy_status (timestamp, production, consumption, feed_in, battery_feed_in, car_charging)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (timestamp, production, consumption, feed_in, battery_feed_in, car_charging))
         conn.commit()
         conn.close()
         
@@ -480,7 +484,7 @@ class DBService:
         cutoff_time = datetime.now() - timedelta(minutes=minutes)
         log.debug(f"Fetching energy status entries from database since cutoff time {cutoff_time}")
         cursor.execute('''
-            SELECT timestamp, production, consumption, feed_in
+            SELECT timestamp, production, consumption, feed_in, battery_feed_in, car_charging
             FROM energy_status
             WHERE timestamp >= ?
             ORDER BY timestamp DESC
@@ -494,6 +498,8 @@ class DBService:
                 production=row[1],
                 consumption=row[2],
                 feed_in=row[3],
+                battery_feed_in=row[4],
+                car_charging=row[5]
             )
             for row in rows
         ]

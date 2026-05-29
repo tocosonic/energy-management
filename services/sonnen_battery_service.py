@@ -15,7 +15,7 @@ class SonnenBatteryService:
         self.sonnen_status: json = None
         self._query_status()
 
-    def _query_status(self):
+    def _query_status(self, car_charging: int = None):
         try:
             url = f"http://{self.host}:{self.port}/api/v1/status"
             headers = {
@@ -26,26 +26,28 @@ class SonnenBatteryService:
                 self.sonnen_status = response.json()
             else:                
                 log.error(f"Error fetching status of Sonnen battery: {response.status_code} - {response.text}")
-                self.sonnen_status = None
+                # keep the last status
         except Exception as e:
             log.error(f"Error fetching status of Sonnen battery: {e}")
-            self.sonnen_status = None
+            # keep the last statuss
             
-        self._save_status_to_db()
+        self._save_status_to_db(car_charging)
 
-    def _save_status_to_db(self):
+    def _save_status_to_db(self, car_charging: int = None):
         """Save the current status of the Sonnen battery to the database."""
         if self.sonnen_status:
             self.db_service.create_energy_status(
                 production=self.get_energy_production(),
                 consumption=self.get_energy_consumption(),
-                feed_in=self.get_grid_feed()
+                feed_in=self.get_grid_feed(),
+                battery_feed_in=self.get_battery_feed(),
+                car_charging=car_charging
             )
 
     # This method can be called to refresh the status of the Sonnen battery.
     # It will call the _query_status method to fetch the latest status from the API.
-    def refresh_status(self):
-        self._query_status()
+    def refresh_status(self, car_charging: int = None):
+        self._query_status(car_charging)
 
     def get_energy_status_time_series(self, minutes: int) -> list[EnergyStatus]:
         """Get a time series of energy status values for the last specified number of minutes."""
