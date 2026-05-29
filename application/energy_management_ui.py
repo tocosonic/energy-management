@@ -123,12 +123,16 @@ class EnergyManagementUI:
                 energy_productions = [status.production / 1000 for status in energy_status]
                 energy_consumptions = [status.consumption / 1000 for status in energy_status]
                 energy_feed_ins = [status.feed_in / 1000 for status in energy_status]
+                battery_feed_ins = [status.battery_feed_in / 1000 for status in energy_status]
+                car_charging = [(status.car_charging or 0) / 1000 for status in energy_status]
                 
                 fig = {
                     "data": [
-                        {"x": timestamps, "y": energy_productions, "type": "line", "name": "Prod.", "line": {"color": "green"}},
-                        {"x": timestamps, "y": energy_consumptions, "type": "line", "name": "Cons.", "line": {"color": "red"}},
-                        {"x": timestamps, "y": energy_feed_ins, "type": "line", "name": "Avail.", "line": {"color": "blue"}},
+                        {"x": timestamps, "y": energy_productions, "type": "line", "name": "Prod.", "line": {"color": "#f3cf03"}},
+                        {"x": timestamps, "y": energy_consumptions, "type": "line", "name": "Cons.", "line": {"color": "#4355fab7"}},
+                        {"x": timestamps, "y": energy_feed_ins, "type": "line", "name": "Avail.", "line": {"color": "#505050"}},
+                        {"x": timestamps, "y": battery_feed_ins, "type": "line", "name": "Battery", "line": {"color": "#50d81b"}},
+                        {"x": timestamps, "y": car_charging, "type": "line", "name": "Car", "line": {"color": "red"}},
                     ],
                     "layout": {
                         "margin": {"t": 0, "r": 0, "b": 18, "l": 40},
