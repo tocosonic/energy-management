@@ -169,8 +169,8 @@ class EnergyManagementApplication:
                 self.sonnen_battery_service.set_enable_discharge()
                 
                 # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
-                min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(2) # self.control_structure.START_CAR_CHARGING_WAIT_TIME
-                # min_power = self.sonnen_battery_service.get_grid_feed_in_average(5)
+                # min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(2) # self.control_structure.START_CAR_CHARGING_WAIT_TIME
+                min_power = self.sonnen_battery_service.get_grid_feed_in_average(10)
                 consumed_power = self.goe_service.get_total_power_average() # self.goe_service.get_current_charging_power()
                 battery_feed_in = self.sonnen_battery_service.get_battery_feed()
                 battery_discharge = -battery_feed_in if battery_feed_in < 0 else 0
