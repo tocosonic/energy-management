@@ -80,7 +80,13 @@ class EnergyManagementApplication:
         
         min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(start_wait_time)
         consumed_power = device.energy_consumption if device.is_on() else 0
-        available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power
+        battery_feed_in = self.sonnen_battery_service.get_battery_feed()
+        battery_discharge = -battery_feed_in if battery_feed_in < 0 else 0
+        # do not allow discharging the battery for extra-powering the heatpump
+        available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power - battery_discharge
+        
+        log.debug(f"Checking heatpump {device.name}: Minimum grid feed-in in the last {start_wait_time} minutes: {min_power} W, consumed power: {consumed_power} W, battery discharge: {battery_discharge} W, energy consumption of the device: {device.energy_consumption} W, buffer power: {self.control_structure.NON_USED_ENERGY_BUFFER} W, available power for the device after buffer: {available_power} W")
+        
         if available_power >= device.energy_consumption:
             close_to_sunset = self.weather_service.is_close_to_sunset()
             if not device.is_on() and not close_to_sunset:
