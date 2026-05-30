@@ -11,7 +11,7 @@ from services.sgready_device_service import SGReadyDeviceService
 from services.panasonic_aquarea_service import PanasonicAquareaService
 
 load_dotenv()
-db_service = DBService(db_path=os.getenv("DATABASE_PATH"))
+db_service = DBService(db_path=os.getenv("DATABASE_PATH"), energy_status_retention_minutes=int(os.getenv("SONNEN_ENERGY_STATUS_RETENTION")))
 sonnen_battery_service = SonnenBatteryService(db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
 goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
 energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
@@ -116,7 +116,7 @@ class EnergyManagementUI:
         with ui.header(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
             ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
             
-            energy_status = db_service.get_energy_status_time_series(60)  # Get energy status for the last 60 minutes
+            energy_status = db_service.get_energy_status_time_series(120)  # Get energy status for the last 60 minutes
             if energy_status:
                 # get list of production values from energy_status
                 timestamps = [status.timestamp for status in energy_status]
@@ -155,8 +155,11 @@ class EnergyManagementUI:
             energy_production = sonnen_battery_service.get_energy_production() / 1000
             energy_consumption = sonnen_battery_service.get_energy_consumption() / 1000
             available_energy = sonnen_battery_service.get_grid_feed() / 1000
-            available_energy_min = sonnen_battery_service.get_grid_feed_in_minimum(STOP_CAR_CHARGING_WAIT_TIME) / 1000
+            # available_energy_min = sonnen_battery_service.get_grid_feed_in_minimum(STOP_CAR_CHARGING_WAIT_TIME) / 1000
+            available_energy_avg = sonnen_battery_service.get_grid_feed_in_average(10) / 1000
+            
             ui.label(f"Production: {energy_production} kW").style("color: #666;")
             ui.label(f"Consumption: {energy_consumption} kW").style("color: #666;")
             ui.label(f"Available: {available_energy} kW").style("color: #666;")
-            ui.label(f"Min. Available ({STOP_CAR_CHARGING_WAIT_TIME} min): {available_energy_min} kW").style("color: #666;")
+            # ui.label(f"Min. Available ({STOP_CAR_CHARGING_WAIT_TIME} min): {available_energy_min} kW").style("color: #666;")
+            ui.label(f"Avg. Available (10 min): {available_energy_avg:.3f} kW").style("color: #666;")

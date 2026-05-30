@@ -32,7 +32,7 @@ class ControlStructure:
 class EnergyManagementApplication:
     def __init__(self):
         load_dotenv()  # Load environment variables from .env file
-        self.db_service = DBService(db_path=os.getenv("DATABASE_PATH"))
+        self.db_service = DBService(db_path=os.getenv("DATABASE_PATH"), energy_status_retention_minutes=int(os.getenv("SONNEN_ENERGY_STATUS_RETENTION")))
         self.weather_service = WeatherService(api_key=os.getenv("OPENWEATHER_API_KEY"), latitude=os.getenv("OPENWEATHER_LAT"), longitude=os.getenv("OPENWEATHER_LON"))
         self.sonnen_battery_service = SonnenBatteryService(self.db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
         self.warm_water_heatpump_service = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heatpump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
