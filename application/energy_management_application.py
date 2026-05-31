@@ -158,7 +158,7 @@ class EnergyManagementApplication:
         current_user = self.goe_service.get_authenticated_user()
         self.check_and_process_user_change(self.db_service.get_goe_action_user_id(), current_user)
 
-        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING]:
+        if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.REQUEST_MAX_CHARGING]:
             log.debug(f"Car charging is currently allowed or the car is charging or charging was completed.")
         
             if self.goe_service.is_car_charging_complete():
@@ -198,7 +198,7 @@ class EnergyManagementApplication:
                                 session_id = self.db_service.get_goe_action_session_id_by_charger_action(ChargerAction.REQUEST_STOP_CHARGING)
                                 return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
                             else:
-                                log.warning(f"Creating new charging session for dynamic charging, because no previous session exists. Current action = {self.db_service.get_goe_action().name}. This should only happen once when the first time the dynamic charging is turned on.")
+                                log.info(f"Creating new charging session for dynamic charging, because no previous session exists. Current action = {self.db_service.get_goe_action().name}. This should only happen once when the first time the dynamic charging is turned on.")
                                 session_id = self.create_car_charging_report_entry_start()
                                 log.debug(f"Created new charging session with ID {session_id} for dynamic charging.")
                                 return self.db_service.create_goe_action(ChargerAction.DYNAMIC_CHARGING, session_id, current_user)
