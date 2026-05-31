@@ -277,11 +277,12 @@ class EnergyManagementApplication:
         self.sonnen_battery_service.set_enable_discharge()
         session_id = self.db_service.get_goe_action_session_id()
         if session_id is not None:
+            self.goe_service.set_charging_off()
             self.create_car_charging_report_entry_end(session_id)
-            return self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, force=True)
+            return self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, force_create=True)
         else:
             log.debug(f"No active charging session found.")
-            return self.db_service.create_goe_action(ChargerAction.NO_ACTION, force=True)
+            return self.db_service.create_goe_action(ChargerAction.NO_ACTION, force_create=True)
         
     def create_car_charging_report_entry_start(self) -> int:
         """Create a new entry in the car charging report with the start time and the energy meter value at the start of the charging session.
