@@ -13,7 +13,7 @@ class SonnenBatteryService:
         self.port = port
         self.api_key = api_key
         self.sonnen_status: json = None
-        self._query_status()
+        self._query_status(update_db=False) # fetch initial status without saving to db, to have the initial status available for the first call of get_battery_status() and to avoid saving an initial empty status to the db.
 
     def _query_status(self, car_charging: int = None, update_db: bool = True):
         try:
@@ -28,8 +28,8 @@ class SonnenBatteryService:
                 log.error(f"Error fetching status of Sonnen battery: {response.status_code} - {response.text}")
                 # keep the last status
         except Exception as e:
-            log.error(f"Error fetching status of Sonnen battery: {e}")
             # keep the last statuss
+            log.error(f"Error fetching status of Sonnen battery: {e}")
             
         if update_db:
             self._save_status_to_db(car_charging)
@@ -62,7 +62,7 @@ class SonnenBatteryService:
     def get_grid_feed_in_average(self, minutes: int) -> int:
         """Get the average grid feed-in value for the last specified number of minutes."""
         time_series = self.get_energy_status_time_series(minutes)
-        return sum(entry.feed_in for entry in time_series) / len(time_series) if time_series else 0
+        return int(sum(entry.feed_in for entry in time_series) / len(time_series) if time_series else 0)
 
     # Status of the Sonnen battery as JSON structure. This includes the current battery level, energy production, and energy consumption.
     def get_battery_status(self) -> json:
