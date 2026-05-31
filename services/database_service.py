@@ -192,7 +192,7 @@ class DBService:
         conn.commit()
         conn.close()
 
-    def create_goe_action(self, action: ChargerAction, session_id: int = None, user_id: int = None, force: bool = False) -> ChargerAction:
+    def create_goe_action(self, action: ChargerAction, session_id: int = None, user_id: int = None, force_create: bool = False) -> ChargerAction:
         """Create the current active GoE action in the database. Only one action can be active at a time."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -202,7 +202,7 @@ class DBService:
         existing = cursor.fetchone()
 
         # If this action is already active, keep the original timestamp.
-        if existing and existing[0] == action.value and not force:
+        if existing and existing[0] == action.value and not force_create:
             conn.close()
             return action
 
