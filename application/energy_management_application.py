@@ -235,6 +235,8 @@ class EnergyManagementApplication:
                         return ChargerAction.REQUEST_STOP_CHARGING
                     else:
                         log.debug(f"Car charging is currently not active, no need to request to stop the car charging due to insufficient excess energy.")
+                        # in case the charger is running: turn it off (the check will be done in the called method)
+                        self.process_charging_finished()
                         return ChargerAction.NO_ACTION
                 
             else:
@@ -275,9 +277,9 @@ class EnergyManagementApplication:
         """Process the event of car charging being finished. This will be triggered when the GoE API indicates that the car charging was completed. The method will turn on the battery discharge to allow the battery to provide energy for home consumption, and will create a new entry in the car charging report with the end time, the energy meter value at the end of the charging session, and the calculated energy consumed during the charging session."""
         log.info(f"Car charging was completed, processing charging finished event.")
         self.sonnen_battery_service.set_enable_discharge()
+        self.goe_service.set_charging_off()
         session_id = self.db_service.get_goe_action_session_id()
         if session_id is not None:
-            self.goe_service.set_charging_off()
             self.create_car_charging_report_entry_end(session_id)
             return self.db_service.create_goe_action(ChargerAction.CHARGING_STOPPED, force_create=True)
         else:
