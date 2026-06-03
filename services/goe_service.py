@@ -91,6 +91,7 @@ class GoEService:
         self.MINIMUM_ENERGY_CONSUMPTION = 1380  # the minimum energy consumption of the car when charging with 6 A on a single phase, which is the minimum allowed current by the charger   
         self.CHARGER_SN = self._get_status("sse")  # the serial number of the charger, which can be used to identify the charger
         self.CHARGER_NAME = self._get_status("fna")  # the name of the charger
+        self.turn_off_on_phase_change = False  # whether to turn off charging when changing the number of phases to avoid issues with the car, can be set to False for faster phase changes if the car supports it
 
     def get_last_user_with_name(self) -> tuple[int, str]:
         """Returns:
@@ -378,7 +379,7 @@ class GoEService:
         ret = False
         
         if current_phases != phases:
-            if is_car_charging:
+            if is_car_charging and self.turn_off_on_phase_change:
                 # turn off charging if changing the number of phases to avoid issues with the car
                 self.set_charging_off()
                 charging_stopped = True
@@ -447,8 +448,6 @@ class GoEService:
             # if the required total current is between 6 and 18 A (18 A is the minimum total current for three phases: 3x 6 A), use single phase charging with the required current
             phases_required = 1 if total_current_required < 18 else 3
             current_required = math.floor(min(total_current_required / phases_required, 16))  # the charger supports a maximum of 16 A per phase
-            
-            # TODO set phases and current at the same time to avoid intermediate states with wrong power, but this requires further testing to make sure that the charger accepts multiple simultaneous setting changes and applies them correctly. For now we set the phases first and then the current with a short delay in between to make sure that the charger has applied the new number of phases before we update the current to avoid issues with unsupported current-phase combinations.
             
             ret = self._set_charging_phases(phases_required)
             log.debug(f"Set charging phases to {phases_required} for requested power {power} W, return value: {ret}")

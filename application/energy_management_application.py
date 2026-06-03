@@ -161,7 +161,10 @@ class EnergyManagementApplication:
         if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.REQUEST_MAX_CHARGING]:
             log.debug(f"Car charging is currently allowed or the car is charging or charging was completed.")
         
-            if self.goe_service.is_car_charging_complete():
+            # TODO check car battery fill percentage
+            car_battery_percentage = 70 # ask the BMW service
+        
+            if self.goe_service.is_car_charging_complete() and car_battery_percentage >= 95:
                 log.debug(f"Car charging was completed.")
                 return self.process_charging_finished()
             elif self.goe_service.is_dynamic_charging_user() and not self.control_structure.GOE_USE_PV_SURPLUS:
