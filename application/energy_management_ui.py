@@ -9,6 +9,7 @@ from services.goe_service import GoEService
 from services.wago_energy_meter import WagoEnergyMeter
 from services.sgready_device_service import SGReadyDeviceService
 from services.panasonic_aquarea_service import PanasonicAquareaService
+from services.bmw_cardata_service import BMWCarDataService
 
 load_dotenv()
 db_service = DBService(db_path=os.getenv("DATABASE_PATH"), energy_status_retention_minutes=int(os.getenv("SONNEN_ENERGY_STATUS_RETENTION")))
@@ -17,8 +18,16 @@ goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_
 energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
 ww_heatpump_service = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heatpump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
 heating_heatpump_service = PanasonicAquareaService(db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
+bmw_cardata_service = BMWCarDataService(db_service=db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"))
 
 STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME"))
+
+def request_token():
+    token = bmw_cardata_service.dcf_step3_request_access_token()
+    if token:
+        ui.notify("Token request successful", type="positive")
+    else:
+        ui.notify("Token request failed", type="negative")
 
 class EnergyManagementUI:
     def __init__(self):
@@ -28,7 +37,7 @@ class EnergyManagementUI:
     def run(self):
         app.add_static_files("/static", "static")
         ui.run(title="Energy Status Dashboard", favicon="static/energy_status_dashboard.ico")
-        
+               
     @ui.page("/")
     def main_page():
         # do not refresh - but rely on the updates of the main loop of the application.
@@ -87,6 +96,46 @@ class EnergyManagementUI:
             charger_error = goe_service.get_error()
             ui.label(f"{charger_error.name}").style("font-size: 16px; margin-top: 0px;")
             
+            # Car Status
+            ui.label("Car Status").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
+
+            if bmw_cardata_service.is_access_token_valid() or bmw_cardata_service.is_refresh_token_valid():
+                container = bmw_cardata_service.get_container_by_name("i5_charging")
+
+                ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                ui.label("Mileage").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                mileage = bmw_cardata_service.get_mileage(container)
+                unit = bmw_cardata_service.get_mileage_unit(container)
+                ui.label(f"{int(mileage):,.0f} {unit}").style("font-size: 16px; margin-top: 0px;")
+                
+                ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                ui.label("Battery level").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                level = bmw_cardata_service.get_battery_charge_level(container)
+                unit = bmw_cardata_service.get_battery_charge_level_unit(container)
+                ui.label(f"{level} {unit}").style("font-size: 16px; margin-top: 0px;")
+                
+                ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                ui.label("Battery delta fully charged").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                delta_fully_charged = bmw_cardata_service.get_battery_delta_fully_charged(container)
+                unit = bmw_cardata_service.get_battery_delta_fully_charged_unit(container)
+                ui.label(f"{delta_fully_charged} {unit}").style("font-size: 16px; margin-top: 0px;")
+                
+            else:
+                ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                ui.label("DCF Step 2").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                verification_uri = bmw_cardata_service.dcf_step2_get_verification_uri()
+                if verification_uri:
+                    ui.link(verification_uri, verification_uri, new_tab=True).style("font-size: 16px; margin-top: 0px;")
+                else:
+                    ui.label("DCF workflow not started yet").style("font-size: 16px; margin-top: 0px;")
+
+                ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                ui.label("DCF Step 3").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                # ui.label("Request token").style("font-size: 16px; margin-top: 0px;")
+                ui.button("Request token", on_click=request_token) \
+                    .props("flat dense no-caps") \
+                    .classes("text-blue-700 underline p-0 min-h-0")
+
             # Sonnen Battery
             ui.label("Sonnen Battery").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")

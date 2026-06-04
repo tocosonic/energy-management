@@ -6,15 +6,6 @@ from datetime import datetime, timedelta
 
 log = logging.getLogger(__name__)
 
-@dataclass(frozen=True)
-class EnergyStatus:
-    timestamp: datetime
-    production: int
-    consumption: int
-    feed_in: int
-    battery_feed_in: int
-    car_charging: int
-
 class ChargerAction(Enum):
     NO_ACTION = 0
     REQUEST_DYNAMIC_CHARGING = 1
@@ -33,6 +24,28 @@ class HeatpumpAction(Enum):
     HEATPUMP_ON = 3
     HEATPUMP_OFF = 4
 
+class BMWCardataAuthKeys(Enum):
+    USER_CODE = (0, "user_code")
+    DEVICE_CODE = (1, "device_code")
+    VERIFICATION_URI = (2, "verification_uri")
+    GCID = (3, "gcid")
+    ACCESS_TOKEN = (4, "access_token")
+    REFRESH_TOKEN = (5, "refresh_token")
+    ID_TOKEN = (6, "id_token")
+    
+    def __init__(self, id, key):
+        self.id = id
+        self.key = key
+
+@dataclass(frozen=True)
+class EnergyStatus:
+    timestamp: datetime
+    production: int
+    consumption: int
+    feed_in: int
+    battery_feed_in: int
+    car_charging: int
+
 @dataclass(frozen=True)
 class HeatpumpStatus:
     id: int
@@ -46,6 +59,20 @@ class ChargerStatus:
     timestamp: datetime
     session_id: int
     user_id: int
+
+@dataclass(frozen=True)
+class BMWCardataAuth:
+    """ This class represents an entry in the bmw_cardata_auth table in the database.
+        It is used to store the authentication information for the BMW CarData API,
+        including the user code, device code, GCID, access token, refresh token, ID token,
+        and the timestamp of when the entry was created or last updated.
+        
+        `expires_in` is the number of seconds until the access token expires, which can be used to determine when to refresh the token. The actual expiration time can be calculated by adding expires_in to the timestamp.
+    """
+    key: BMWCardataAuthKeys
+    value: str
+    expires_in: int
+    timestamp: datetime
 
 class DBService:
     def __init__(self, db_path, energy_status_retention_minutes: int = 60):
@@ -115,6 +142,18 @@ class DBService:
                 energy_meter_start INTEGER NOT NULL,
                 energy_meter_end INTEGER,
                 energy_consumed_wh INTEGER
+            )
+        ''')
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bmw_cardata_auth (
+                id INTEGER PRIMARY KEY NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT,
+                expires_in INTEGER,
+                timestamp DATETIME NOT NULL
             )
         ''')
         conn.commit()
@@ -516,3 +555,61 @@ class DBService:
         conn.commit()
         conn.close()
         
+    def create_bmw_cardata_auth_entry(self, entry: BMWCardataAuth):
+        """Create or update an entry in the bmw_cardata_auth table for a given key."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        log.debug(f"Creating/updating BMW CarData auth entry in database for {entry.key.key} and timestamp {entry.timestamp}")
+        # check, if the entry needs an update or not
+        cursor.execute('''
+            SELECT value FROM bmw_cardata_auth WHERE id = ? LIMIT 1
+        ''', (entry.key.id,))
+        existing = cursor.fetchone()
+        if existing and existing[0] == entry.value:
+            conn.close()
+            return
+        elif existing:
+            log.debug(f"BMW CarData auth entry in database for key {entry.key.key} already exists with value {existing[0]}. Updating the entry with new value {entry.value}, expires_in {entry.expires_in}, and timestamp {entry.timestamp}")
+            cursor.execute('''
+                UPDATE bmw_cardata_auth
+                SET value = ?, expires_in = ?, timestamp = ?
+                WHERE id = ?
+            ''', (entry.value, entry.expires_in, entry.timestamp, entry.key.id))
+        else:
+            cursor.execute('''
+                INSERT INTO bmw_cardata_auth (id, key, value, expires_in, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (entry.key.id, entry.key.key, entry.value, entry.expires_in, entry.timestamp))
+        conn.commit()
+        conn.close()
+              
+    def delete_bmw_cardata_auth_entry(self, key: BMWCardataAuthKeys):
+        """Delete an entry from the bmw_cardata_auth table for a given key."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        log.debug(f"Deleting BMW CarData auth entry from database for key {key.key}")
+        cursor.execute('''
+            DELETE FROM bmw_cardata_auth WHERE id = ?
+        ''', (key.id,))
+        conn.commit()
+        conn.close()
+        
+    def get_bmw_cardata_auth_entry(self, key: BMWCardataAuthKeys) -> BMWCardataAuth:
+        """Get an entry from the bmw_cardata_auth table for a given key."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        log.debug(f"Fetching BMW CarData auth entry from database for key {key.key}")
+        cursor.execute('''
+            SELECT value, expires_in, timestamp FROM bmw_cardata_auth WHERE id = ? LIMIT 1
+        ''', (key.id,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return BMWCardataAuth(
+                key=key,
+                value=row[0],
+                expires_in=row[1],
+                timestamp=datetime.fromisoformat(row[2])
+            )
+        return None
+    
