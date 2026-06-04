@@ -3,6 +3,7 @@ import logging
 import json
 import requests
 
+from paho.mqtt import client as mqtt_client
 from dataclasses import dataclass
 from services.database_service import BMWCardataAuth, BMWCardataAuthKeys, DBService
 
@@ -24,14 +25,93 @@ class DCFToken:
     gcid: str
 
 class BMWCarDataService:
-    def __init__(self, db_service: DBService, vin: str, client_id: str):
+    """ Service for accessing the BMW CarData API. It handles the DCF workflow for authentication and provides methods for accessing the car data.
+        `streaming_user` and `streaming_topic` are optional parameters that can be used to access the BMW CarData streaming API. If they are provided, the service will also handle the authentication for the streaming API and provide methods for accessing the streaming data.
+    """
+    def __init__(self, db_service: DBService, vin: str, client_id: str, streaming_user: str = None, streaming_topic: str = None):
         self.db_service = db_service
+        self.mqtt_client = None
         self.vin = vin
         self.client_id = client_id
+        self.streaming_user = streaming_user
+        self.streaming_topic = streaming_topic
         
         if not self.is_access_token_valid(600) and not self.is_refresh_token_valid(600):
             log.debug(f"Access token and refresh token are not valid. Start DCF workflow.")
             self.dcf_step1_request_user_and_device_code()
+
+    def is_mqtt_client_connected(self) -> bool:
+        """Check if the MQTT client is connected to the BMW CarData streaming API."""
+        if self.mqtt_client:
+            return self.mqtt_client.is_connected()
+        else:
+            log.warning("MQTT client is not initialized. Cannot check connection status.")
+            return False
+
+    def init_mqtt_client(self) -> bool:
+        """Initialize the MQTT client for the BMW CarData streaming API."""
+        if not self.streaming_user or not self.streaming_topic:
+            log.error("Streaming user and streaming topic must be provided to initialize the MQTT client.")
+            return False
+
+        if not self.is_access_token_valid():
+            log.debug("Access token is not valid. Refresh access token before initializing MQTT client.")
+            return False
+            
+        def on_mqtt_connect(client, userdata, flags, reason_code, properties) -> bool:
+            if reason_code == 0:
+                log.debug("Connected to BMW MQTT broker successfully.")
+            else:
+                log.error(f"Failed to connect to BMW MQTT broker. Return code: {reason_code}")
+
+        self.mqtt_client = mqtt_client.Client(
+            client_id=f"energy-management-app-{self.vin}",
+            protocol=mqtt_client.MQTTv311,
+            callback_api_version=mqtt_client.CallbackAPIVersion.VERSION2
+        )
+        self.mqtt_client.tls_set() # BMW MQTT broker requires TLS
+        id_token = self.db_service.get_bmw_cardata_auth_entry(BMWCardataAuthKeys.ID_TOKEN)
+        self.mqtt_client.username_pw_set(self.streaming_user, id_token.value)
+        self.mqtt_client.on_connect = on_mqtt_connect
+        
+        # self.mqtt_client.on_message = self._on_mqtt_message
+        self.mqtt_client.connect("customer.streaming-cardata.bmwgroup.com", 9000)
+        return True
+
+    def disconnect_mqtt_client(self):
+        """Disconnect the MQTT client from the BMW CarData streaming API."""
+        if self.mqtt_client:
+            self.mqtt_client.disconnect()
+            self.mqtt_client = None
+            log.debug("Disconnected from BMW MQTT broker.")
+        else:
+            log.warning("MQTT client is not initialized. Cannot disconnect.")
+
+    def subscribe_to_streaming_topic(self) -> bool:
+        """Subscribe to the streaming topic for the car data."""
+        if self.mqtt_client:
+            topic = f"{self.streaming_user}/{self.streaming_topic}"
+            self.mqtt_client.subscribe(topic)
+            self.mqtt_client.on_message = self._on_mqtt_message
+            log.debug(f"Subscribed to BMW MQTT topic: {topic}")
+            return True
+        else:
+            log.error("MQTT client is not initialized. Cannot subscribe to topic.")
+            return False
+
+    def _on_mqtt_message(self, client, userdata, msg):
+        """Callback function for handling incoming MQTT messages from the BMW CarData streaming API."""
+        log.info(f"Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
+        # Here you can add code to process the incoming streaming data as needed.
+        # TODO store messages in the database
+
+    def run_mqtt_client(self):
+        """Run the MQTT client loop to receive streaming data from the BMW CarData streaming API."""
+        if self.mqtt_client:
+            self.mqtt_client.loop_start()
+            log.debug("Started MQTT client loop.")
+        else:
+            log.error("MQTT client is not initialized. Cannot start loop.")
 
     def is_access_token_valid(self, grace_period: int = 0) -> bool:
         """Check if the access token stored in the database is still valid."""
@@ -224,9 +304,11 @@ class BMWCarDataService:
             return None
         elif self.is_refresh_token_valid(600):
             log.debug("Access token is not valid, but refresh token is still valid. Refresh access token.")
+            self.disconnect_mqtt_client() # will be restarted in the main loop of the application after refreshing the access token
             return self.dcf_step4_refresh_access_token()
         else:
             log.debug("Access token and refresh token are not valid. Start DCF workflow.")
+            self.disconnect_mqtt_client() # will be restarted in the main loop of the application after refreshing the access token
             self.dcf_step1_request_user_and_device_code()
             return None
         

@@ -40,7 +40,7 @@ class EnergyManagementApplication:
         self.heating_heatpump_service = PanasonicAquareaService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
         self.goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
         self.energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
-        self.bmw_cardata_service = BMWCarDataService(db_service=self.db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"))
+        self.bmw_cardata_service = BMWCarDataService(db_service=self.db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"), streaming_user=os.getenv("BMW_STREAMING_USER"), streaming_topic=os.getenv("BMW_STREAMING_TOPIC"))
         self._init_control_structure()
 
     def _init_control_structure(self):
@@ -60,6 +60,19 @@ class EnergyManagementApplication:
         sleep_time: int = 60
         """Main loop of the energy management application. This will continuously monitor the energy status, weather conditions, and Sonnen battery status, and control the devices accordingly."""
         while True:
+            self.bmw_cardata_service.refresh_access_token_if_needed()
+            
+            if not self.bmw_cardata_service.is_mqtt_client_connected():
+                if self.bmw_cardata_service.init_mqtt_client():
+                    log.debug("BMW MQTT client initialized successfully.")
+                    if self.bmw_cardata_service.subscribe_to_streaming_topic():
+                        log.debug("Subscribed to BMW MQTT streaming topic successfully.")
+                        self.bmw_cardata_service.run_mqtt_client()
+                    else:
+                        log.warning("Failed to subscribe to BMW MQTT streaming topic. Will retry in the next iteration.")
+                else:
+                    log.warning("Failed to initialize BMW MQTT client. Will retry in the next iteration.")
+
             # Refresh the status of the Sonnen battery
             car_charging = self.energy_meter.get_current_power_w()
             self.sonnen_battery_service.refresh_status(car_charging=car_charging)
@@ -68,8 +81,6 @@ class EnergyManagementApplication:
             self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)
 
             self.update_car_charging()
-            
-            self.bmw_cardata_service.refresh_access_token_if_needed()
 
             sleep(sleep_time)  # Sleep for 60 seconds before checking again
     
