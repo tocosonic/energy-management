@@ -106,19 +106,28 @@ class EnergyManagementUI:
                 ui.label("Mileage").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 mileage = bmw_cardata_service.get_mileage(container)
                 unit = bmw_cardata_service.get_mileage_unit(container)
-                ui.label(f"{int(mileage):,.0f} {unit}").style("font-size: 16px; margin-top: 0px;")
+                if mileage is not None and unit is not None:
+                    ui.label(f"{int(mileage):,.0f} {unit}").style("font-size: 16px; margin-top: 0px;")
+                else:
+                    ui.label("n/a").style("font-size: 16px; margin-top: 0px;")
                 
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 ui.label("Battery level").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 level = bmw_cardata_service.get_battery_charge_level(container)
                 unit = bmw_cardata_service.get_battery_charge_level_unit(container)
-                ui.label(f"{level} {unit}").style("font-size: 16px; margin-top: 0px;")
+                if level is not None and unit is not None:
+                    ui.label(f"{level} {unit}").style("font-size: 16px; margin-top: 0px;")
+                else:
+                    ui.label("n/a").style("font-size: 16px; margin-top: 0px;")
                 
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 ui.label("Battery delta fully charged").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 delta_fully_charged = bmw_cardata_service.get_battery_delta_fully_charged(container)
                 unit = bmw_cardata_service.get_battery_delta_fully_charged_unit(container)
-                ui.label(f"{delta_fully_charged} {unit}").style("font-size: 16px; margin-top: 0px;")
+                if delta_fully_charged is not None and unit is not None:
+                    ui.label(f"{delta_fully_charged} {unit}").style("font-size: 16px; margin-top: 0px;")
+                else:
+                    ui.label("n/a").style("font-size: 16px; margin-top: 0px;")
                 
             else:
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")

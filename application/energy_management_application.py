@@ -165,11 +165,20 @@ class EnergyManagementApplication:
 
         if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.REQUEST_MAX_CHARGING]:
             log.debug(f"Car charging is currently allowed or the car is charging or charging was completed.")
+
+            # TODO build a real solution using MQTT streaming; there is a 50 API calls/day limit for the GoE API, so we cannot call the API multiple times in a short time period to check the car status
+            car_reports_complete = self.goe_service.is_car_charging_complete()
+            car_battery_charge_level = 70 # set to 70% as a default value to avoid that the car charging is turned off due to the missing battery charge level information
+            if car_reports_complete:
+                log.debug(f"GoE API reports that the car status says that charging was completed.")
+                container = self.bmw_cardata_service.get_container_by_name("i5_charging")
+                car_battery_charge_level = self.bmw_cardata_service.get_battery_charge_level(container)
         
-            container = self.bmw_cardata_service.get_container_by_name("i5_charging")
-            car_battery_charge_level = self.bmw_cardata_service.get_battery_charge_level(container)
+                if car_battery_charge_level is None:
+                    log.warning(f"Car battery charge level is not available.")
+                    car_battery_charge_level = 70  # set to 70% as a default value to avoid that the car charging is turned off due to the missing battery charge level information
         
-            if self.goe_service.is_car_charging_complete() and car_battery_charge_level >= 95:
+            if car_reports_complete and car_battery_charge_level >= 95:
                 log.debug(f"Car charging was completed.")
                 return self.process_charging_finished()
             elif self.goe_service.is_dynamic_charging_user() and not self.control_structure.GOE_USE_PV_SURPLUS:
