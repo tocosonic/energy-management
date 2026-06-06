@@ -45,7 +45,11 @@ class BMWCarDataService:
     def is_mqtt_client_connected(self) -> bool:
         """Check if the MQTT client is connected to the BMW CarData streaming API."""
         if self.mqtt_client:
-            return self.mqtt_client.is_connected()
+            ret = self.mqtt_client.is_connected()
+            if not ret:
+                log.warning("MQTT client is initialized but not connected to BMW MQTT broker. Disconnecting the session now.")
+                self.disconnect_mqtt_client()
+            return ret
         else:
             log.warning("MQTT client is not initialized. Cannot check connection status.")
             return False
@@ -76,6 +80,7 @@ class BMWCarDataService:
         self.mqtt_client.tls_set() # BMW MQTT broker requires TLS
         id_token = self.db_service.get_bmw_cardata_auth_entry(BMWCardataAuthKeys.ID_TOKEN)
         self.mqtt_client.username_pw_set(self.streaming_user, id_token.value)
+        self.mqtt_client.reconnect_delay_set(min_delay=90, max_delay=120) # don't use auto-reconnect feature of the MQTT client, because BMW MQTT broker has a rate limit. Instead, we will handle reconnection manually in the main loop of the application after refreshing the access token if needed.
         self.mqtt_client.on_connect = on_mqtt_connect
         
         # self.mqtt_client.on_message = self._on_mqtt_message
