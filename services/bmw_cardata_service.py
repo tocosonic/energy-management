@@ -2,6 +2,7 @@ from datetime import datetime
 import logging
 import json
 from json import JSONDecodeError
+import random
 import requests
 
 from paho.mqtt import client as mqtt_client
@@ -61,12 +62,14 @@ class BMWCarDataService:
             
         def on_mqtt_connect(client, userdata, flags, reason_code, properties) -> bool:
             if reason_code == 0:
-                log.debug("Connected to BMW MQTT broker successfully.")
+                log.debug("## Connected to BMW MQTT broker successfully.")
             else:
-                log.error(f"Failed to connect to BMW MQTT broker. Return code: {reason_code}")
+                log.error(f"##!! Failed to connect to BMW MQTT broker. Return code: {reason_code}")
+
+        client_id_rnd = random.randint(0, 100000) # generate random client ID to avoid "client ID already in use" error from BMW MQTT broker
 
         self.mqtt_client = mqtt_client.Client(
-            client_id=f"energy-management-app-{self.vin}",
+            client_id=f"ema-{client_id_rnd}",
             protocol=mqtt_client.MQTTv311,
             callback_api_version=mqtt_client.CallbackAPIVersion.VERSION2
         )
@@ -76,7 +79,11 @@ class BMWCarDataService:
         self.mqtt_client.on_connect = on_mqtt_connect
         
         # self.mqtt_client.on_message = self._on_mqtt_message
-        self.mqtt_client.connect("customer.streaming-cardata.bmwgroup.com", 9000)
+        err = self.mqtt_client.connect("customer.streaming-cardata.bmwgroup.com", 9000)
+        log.info(f"## Connecting to BMW MQTT broker for streaming data with client ID 'ema-{client_id_rnd}' and streaming user '{self.streaming_user}'.")
+        if err != 0:
+            log.error(f"##!! Failed to connect to BMW MQTT broker. Error code: {err}")
+            return False
         return True
 
     def disconnect_mqtt_client(self):
