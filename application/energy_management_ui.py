@@ -18,7 +18,7 @@ goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_
 energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
 ww_heatpump_service = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heatpump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
 heating_heatpump_service = PanasonicAquareaService(db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
-bmw_cardata_service = BMWCarDataService(db_service=db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"))
+bmw_cardata_service = BMWCarDataService(db_service=db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"), streaming_topic=os.getenv("BMW_STREAMING_TOPIC"))
 
 STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME"))
 
@@ -100,32 +100,39 @@ class EnergyManagementUI:
             ui.label("Car Status").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
 
             if bmw_cardata_service.is_access_token_valid() or bmw_cardata_service.is_refresh_token_valid():
-                container = bmw_cardata_service.get_container_by_name("i5_charging")
-
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 ui.label("Mileage").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-                mileage = bmw_cardata_service.get_mileage(container)
-                unit = bmw_cardata_service.get_mileage_unit(container)
-                if mileage is not None and unit is not None:
-                    ui.label(f"{int(mileage):,.0f} {unit}").style("font-size: 16px; margin-top: 0px;")
+                mileage_data = bmw_cardata_service.get_mileage()
+                if mileage_data is not None:
+                    mileage, unit, timestamp = mileage_data
+                else:
+                    mileage, unit, timestamp = None, None, None
+                if mileage is not None and unit is not None and timestamp is not None:
+                    ui.label(f"{int(mileage):,.0f} {unit} (since {timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
                 else:
                     ui.label("n/a").style("font-size: 16px; margin-top: 0px;")
                 
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 ui.label("Battery level").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-                level = bmw_cardata_service.get_battery_charge_level(container)
-                unit = bmw_cardata_service.get_battery_charge_level_unit(container)
-                if level is not None and unit is not None:
-                    ui.label(f"{level} {unit}").style("font-size: 16px; margin-top: 0px;")
+                battery_level_data = bmw_cardata_service.get_battery_charge_level()
+                if battery_level_data is not None:
+                    level, unit, timestamp = battery_level_data
+                else:
+                    level, unit, timestamp = None, None, None
+                if level is not None and unit is not None and timestamp is not None:
+                    ui.label(f"{level} {unit} (since {timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
                 else:
                     ui.label("n/a").style("font-size: 16px; margin-top: 0px;")
                 
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 ui.label("Battery delta fully charged").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-                delta_fully_charged = bmw_cardata_service.get_battery_delta_fully_charged(container)
-                unit = bmw_cardata_service.get_battery_delta_fully_charged_unit(container)
-                if delta_fully_charged is not None and unit is not None:
-                    ui.label(f"{delta_fully_charged} {unit}").style("font-size: 16px; margin-top: 0px;")
+                battery_delta_data = bmw_cardata_service.get_battery_delta_fully_charged()
+                if battery_delta_data is not None:
+                    delta_fully_charged, unit, timestamp = battery_delta_data
+                else:
+                    delta_fully_charged, unit, timestamp = None, None, None
+                if delta_fully_charged is not None and unit is not None and timestamp is not None:
+                    ui.label(f"{delta_fully_charged} {unit} (since {timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
                 else:
                     ui.label("n/a").style("font-size: 16px; margin-top: 0px;")
                 

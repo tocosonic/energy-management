@@ -74,6 +74,17 @@ class BMWCardataAuth:
     expires_in: int
     timestamp: datetime
 
+@dataclass(frozen=True)
+class BMWCardataMessage:
+    """ This class represents a message received from the BMW CarData streaming API via MQTT.
+        It includes the topic of the message, the key, the value, the unit, and the timestamp of when the message was received.
+    """
+    topic: str
+    key: str
+    value: str
+    unit: str
+    timestamp: datetime
+
 class DBService:
     def __init__(self, db_path, energy_status_retention_minutes: int = 60):
         self.db_path = db_path
@@ -153,6 +164,19 @@ class DBService:
                 key TEXT NOT NULL,
                 value TEXT,
                 expires_in INTEGER,
+                timestamp DATETIME NOT NULL
+            )
+        ''')
+        conn.commit()
+
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bmw_cardata_message (
+                id INTEGER PRIMARY KEY NOT NULL,
+                topic TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT,
+                unit TEXT,
                 timestamp DATETIME NOT NULL
             )
         ''')
@@ -613,3 +637,47 @@ class DBService:
             )
         return None
     
+    def create_bmw_cardata_message_entry(self, message: BMWCardataMessage):
+        """Create a new entry in the bmw_cardata_message table for a received MQTT message from the BMW CarData streaming API."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        log.debug(f"Creating BMW CarData message entry in database for topic {message.topic}, key {message.key}, value {message.value}, unit {message.unit}, and timestamp {message.timestamp}")
+        # check, if the entry needs an update or not based on the topic and key, because there could be multiple messages with the same topic but different keys
+        cursor.execute('''
+            SELECT id FROM bmw_cardata_message WHERE topic = ? AND key = ? LIMIT 1
+        ''', (message.topic, message.key))
+        existing = cursor.fetchone()
+        if existing:
+            log.debug(f"BMW CarData message entry in database for topic {message.topic} and key {message.key} already exists with value {existing[0]}. Updating the entry with new value {message.value}, unit {message.unit}, and timestamp {message.timestamp}")
+            cursor.execute('''
+                UPDATE bmw_cardata_message
+                SET value = ?, unit = ?, timestamp = ?
+                WHERE id = ?
+            ''', (message.value, message.unit, message.timestamp, existing[0]))
+        else:
+            cursor.execute('''
+                INSERT INTO bmw_cardata_message (topic, key, value, unit, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (message.topic, message.key, message.value, message.unit, message.timestamp))
+        conn.commit()
+        conn.close()
+        
+    def get_bmw_cardata_message_entry(self, topic: str, key: str) -> BMWCardataMessage:
+        """Get an entry from the bmw_cardata_message table for a given topic and key."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        log.debug(f"Fetching BMW CarData message entry from database for topic {topic} and key {key}")
+        cursor.execute('''
+            SELECT value, unit, timestamp FROM bmw_cardata_message WHERE topic = ? AND key = ? LIMIT 1
+        ''', (topic, key))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return BMWCardataMessage(
+                topic=topic,
+                key=key,
+                value=row[0],
+                unit=row[1],
+                timestamp=datetime.fromisoformat(row[2])
+            )
+        return None

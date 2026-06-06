@@ -182,8 +182,12 @@ class EnergyManagementApplication:
             car_battery_charge_level = 70 # set to 70% as a default value to avoid that the car charging is turned off due to the missing battery charge level information
             if car_reports_complete:
                 log.debug(f"GoE API reports that the car status says that charging was completed.")
-                container = self.bmw_cardata_service.get_container_by_name("i5_charging")
-                car_battery_charge_level = self.bmw_cardata_service.get_battery_charge_level(container)
+                # container = None # self.bmw_cardata_service.get_container_by_name("i5_charging")
+                battery_level = self.bmw_cardata_service.get_battery_charge_level()
+                if battery_level is not None:
+                    car_battery_charge_level, unit, timestamp = battery_level
+                else:
+                    car_battery_charge_level, unit, timestamp = None, None, None
         
                 if car_battery_charge_level is None:
                     log.warning(f"Car battery charge level is not available.")

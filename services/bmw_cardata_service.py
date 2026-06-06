@@ -1,11 +1,12 @@
 from datetime import datetime
 import logging
 import json
+from json import JSONDecodeError
 import requests
 
 from paho.mqtt import client as mqtt_client
 from dataclasses import dataclass
-from services.database_service import BMWCardataAuth, BMWCardataAuthKeys, DBService
+from services.database_service import BMWCardataAuth, BMWCardataAuthKeys, BMWCardataMessage, DBService
 
 log = logging.getLogger(__name__)
 
@@ -99,11 +100,37 @@ class BMWCarDataService:
             log.error("MQTT client is not initialized. Cannot subscribe to topic.")
             return False
 
-    def _on_mqtt_message(self, client, userdata, msg):
+    def _on_mqtt_message(self, client, userdata, msg: mqtt_client.MQTTMessage):
         """Callback function for handling incoming MQTT messages from the BMW CarData streaming API."""
-        log.info(f"Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
+        # log.info(f"Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
+        print(f">>>>> Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
         # Here you can add code to process the incoming streaming data as needed.
-        # TODO store messages in the database
+        try:
+            payload_json: dict = json.loads(msg.payload.decode())
+        except JSONDecodeError as e:
+            log.error(f"Error decoding MQTT message payload as JSON: {e}")
+            print((f"!!!!! Error decoding MQTT message payload as JSON: {e}"))
+            return
+        
+        data: dict = payload_json["data"]
+        key: str | None = list(data.keys())[0] if data else None
+        print(f">>>> Extracted key from MQTT message: {key}")
+        values: dict | None = data[key] if key else None
+        if isinstance(values, dict):
+            print(f">>>> Extracted values from MQTT message: {values}")
+            value = str(values.get("value", ""))
+            unit = values.get("unit", None)
+            bmw_message = BMWCardataMessage(
+                topic=payload_json["topic"],
+                key=key,
+                value=value,
+                unit=unit,
+                timestamp=datetime.now()
+            )
+            print(f">>>> Created BMWCardataMessage: {bmw_message}")
+            self.db_service.create_bmw_cardata_message_entry(bmw_message)
+        else:
+            print(f"!!!!! Values in MQTT message are not in expected format: {values}")
 
     def run_mqtt_client(self):
         """Run the MQTT client loop to receive streaming data from the BMW CarData streaming API."""
@@ -404,80 +431,48 @@ class BMWCarDataService:
             log.error(f"Error requesting container data from BMW API: {response.status_code} - {response.text}")
             return None
 
-    def get_mileage(self, container: dict) -> int | None:
+    def get_mileage(self) -> tuple[int, str, datetime] | None:
         """Get the mileage of the car."""
-        if container:
-            mileage = container['telematicData']['vehicle.vehicle.travelledDistance']['value']
-            if mileage is not None:
-                return int(mileage)
-            else:
-                log.error(f"Mileage not found in container data for container 'i5_charging'.")
+        msg = self.db_service.get_bmw_cardata_message_entry(self.streaming_topic, "vehicle.vehicle.travelledDistance")
+        if msg:
+            try:
+                value = int(msg.value)
+                unit = msg.unit
+                return value, unit, msg.timestamp
+            except ValueError as e:
+                log.error(f"Error converting mileage value to int: {e}")
                 return None
         else:
-            log.error(f"Container must not be None.")
+            log.error(f"Mileage not found in database for topic '{self.streaming_topic}' and key 'vehicle.vehicle.travelledDistance'.")
             return None
         
-    def get_mileage_unit(self, container: dict) -> str | None:
-        """Get the unit of the mileage."""
-        if container:
-            mileage_unit = container['telematicData']['vehicle.vehicle.travelledDistance']['unit']
-            if mileage_unit is not None:
-                return mileage_unit
-            else:
-                log.error(f"Mileage unit not found in container data for container 'i5_charging'.")
-                return None
-        else:
-            log.error(f"Container must not be None.")
-            return None
-        
-    def get_battery_charge_level(self, container: dict) -> int | None:
+    def get_battery_charge_level(self) -> tuple[int, str, datetime] | None:
         """Get the battery charge level of the car."""
-        if container:
-            charge_level = container['telematicData']['vehicle.drivetrain.batteryManagement.header']['value']
-            if charge_level is not None:
-                return int(charge_level)
-            else:
-                log.error(f"Battery charge level not found in container data for container 'i5_charging'.")
+        msg = self.db_service.get_bmw_cardata_message_entry(self.streaming_topic, "vehicle.drivetrain.batteryManagement.header")
+        if msg:
+            try:
+                value = int(msg.value)
+                unit = "%" if msg.unit == "percent" else msg.unit
+                return value, unit, msg.timestamp
+            except ValueError as e:
+                log.error(f"Error converting battery charge level value to int: {e}")
                 return None
         else:
-            log.error(f"Container must not be None.")
+            log.error(f"Battery charge level not found in database for topic '{self.streaming_topic}' and key 'vehicle.drivetrain.batteryManagement.header'.")
             return None
-        
-    def get_battery_charge_level_unit(self, container: dict) -> str | None:
-        """Get the unit of the battery charge level."""
-        if container:
-            charge_level_unit = container['telematicData']['vehicle.drivetrain.batteryManagement.header']['unit']
-            if charge_level_unit is not None:
-                return charge_level_unit
-            else:
-                log.error(f"Battery charge level unit not found in container data for container 'i5_charging'.")
-                return None
-        else:
-            log.error(f"Container must not be None.")
-            return None
-        
-    def get_battery_delta_fully_charged(self, container: dict) -> int | None:
+
+    def get_battery_delta_fully_charged(self) -> tuple[int, str, datetime] | None:
         """Get the amount of energy missing for a full charge."""
-        if container:
-            delta_fully_charged = container['telematicData']['vehicle.drivetrain.electricEngine.charging.smeEnergyDeltaFullyCharged']['value']
-            if delta_fully_charged is not None:
-                return int(delta_fully_charged)
-            else:
-                log.error(f"Delta fully charged not found in container data for container 'i5_charging'.")
+        msg = self.db_service.get_bmw_cardata_message_entry(self.streaming_topic, "vehicle.drivetrain.electricEngine.charging.smeEnergyDeltaFullyCharged")
+        if msg:
+            try:
+                value = int(msg.value)
+                unit = msg.unit
+                timestamp = msg.timestamp
+                return value, unit, timestamp
+            except ValueError as e:
+                log.error(f"Error converting battery delta fully charged value to int: {e}")
                 return None
         else:
-            log.error(f"Container must not be None.")
-            return None
-        
-    def get_battery_delta_fully_charged_unit(self, container: dict) -> str | None:
-        """Get the unit of the amount of energy missing for a full charge."""
-        if container:
-            delta_fully_charged_unit = container['telematicData']['vehicle.drivetrain.electricEngine.charging.smeEnergyDeltaFullyCharged']['unit']
-            if delta_fully_charged_unit is not None:
-                return delta_fully_charged_unit
-            else:
-                log.error(f"Delta fully charged unit not found in container data for container 'i5_charging'.")
-                return None
-        else:
-            log.error(f"Container must not be None.")
+            log.error(f"Battery delta fully charged not found in database for topic '{self.streaming_topic}' and key 'vehicle.drivetrain.electricEngine.charging.smeEnergyDeltaFullyCharged'.")
             return None
