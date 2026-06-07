@@ -12,6 +12,7 @@ from services.weather_service import WeatherService
 from services.sgready_device_service import SGReadyDeviceService
 from services.panasonic_aquarea_service import PanasonicAquareaService
 from services.wago_energy_meter import WagoEnergyMeter
+from services.bmw_cardata_service import BMWCarDataService
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class EnergyManagementApplication:
         self.heating_heatpump_service = PanasonicAquareaService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
         self.goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
         self.energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
+        self.bmw_cardata_service = BMWCarDataService(db_service=self.db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"), streaming_user=os.getenv("BMW_STREAMING_USER"), streaming_topic=os.getenv("BMW_STREAMING_TOPIC"))
         self._init_control_structure()
 
     def _init_control_structure(self):
@@ -58,6 +60,19 @@ class EnergyManagementApplication:
         sleep_time: int = 60
         """Main loop of the energy management application. This will continuously monitor the energy status, weather conditions, and Sonnen battery status, and control the devices accordingly."""
         while True:
+            self.bmw_cardata_service.refresh_access_token_if_needed()
+            
+            if not self.bmw_cardata_service.is_mqtt_client_connected():
+                if self.bmw_cardata_service.init_mqtt_client():
+                    log.debug("BMW MQTT client initialized successfully.")
+                    if self.bmw_cardata_service.subscribe_to_streaming_topic():
+                        log.debug("Subscribed to BMW MQTT streaming topic successfully.")
+                        self.bmw_cardata_service.run_mqtt_client()
+                    else:
+                        log.warning("Failed to subscribe to BMW MQTT streaming topic. Will retry in the next iteration.")
+                else:
+                    log.warning("Failed to initialize BMW MQTT client. Will retry in the next iteration.")
+
             # Refresh the status of the Sonnen battery
             car_charging = self.energy_meter.get_current_power_w()
             self.sonnen_battery_service.refresh_status(car_charging=car_charging)
@@ -66,6 +81,7 @@ class EnergyManagementApplication:
             self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)
 
             self.update_car_charging()
+
             sleep(sleep_time)  # Sleep for 60 seconds before checking again
     
     ######################
@@ -160,11 +176,24 @@ class EnergyManagementApplication:
 
         if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.REQUEST_MAX_CHARGING]:
             log.debug(f"Car charging is currently allowed or the car is charging or charging was completed.")
+
+            # TODO build a real solution using MQTT streaming; there is a 50 API calls/day limit for the GoE API, so we cannot call the API multiple times in a short time period to check the car status
+            car_reports_complete = self.goe_service.is_car_charging_complete()
+            car_battery_charge_level = 70 # set to 70% as a default value to avoid that the car charging is turned off due to the missing battery charge level information
+            if car_reports_complete:
+                log.debug(f"GoE API reports that the car status says that charging was completed.")
+                # container = None # self.bmw_cardata_service.get_container_by_name("i5_charging")
+                battery_level = self.bmw_cardata_service.get_battery_charge_level()
+                if battery_level is not None:
+                    car_battery_charge_level, unit, timestamp = battery_level
+                else:
+                    car_battery_charge_level, unit, timestamp = None, None, None
         
-            # TODO check car battery fill percentage
-            car_battery_percentage = 70 # ask the BMW service
+                if car_battery_charge_level is None:
+                    log.warning(f"Car battery charge level is not available.")
+                    car_battery_charge_level = 70  # set to 70% as a default value to avoid that the car charging is turned off due to the missing battery charge level information
         
-            if self.goe_service.is_car_charging_complete() and car_battery_percentage >= 95:
+            if car_reports_complete and car_battery_charge_level >= 95:
                 log.debug(f"Car charging was completed.")
                 return self.process_charging_finished()
             elif self.goe_service.is_dynamic_charging_user() and not self.control_structure.GOE_USE_PV_SURPLUS:

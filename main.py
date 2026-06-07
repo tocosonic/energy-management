@@ -10,10 +10,14 @@ import yaml
 from time import sleep
 import RPi.GPIO as GPIO
 
+import json
+import requests
+
 from dotenv import load_dotenv
 
 from application.energy_management_application import EnergyManagementApplication
 from application.energy_management_ui import EnergyManagementUI
+# from services.bmw_cardata_service import BMWCarDataService
 from services.goe_service import GoEService, LogicMode
 from services.sonnen_battery_service import SonnenBatteryService
 from services.wago_energy_meter import WagoEnergyMeter
@@ -28,7 +32,7 @@ with open("logging.yaml", "r") as f:
 log = logging.getLogger(__name__)
 # logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-def main(bypass_run: bool = False, start_ui: bool = False):
+def main(bypass_run: bool = False, start_ui: bool = False, bmw_test: bool = False):
     """
     Main function to initialize the energy management application and run it.
     # Installation as Service:
@@ -106,6 +110,97 @@ def main(bypass_run: bool = False, start_ui: bool = False):
         log.info("Starting UI instance")
         appUI = EnergyManagementUI()
         appUI.run()
+    elif bmw_test:
+        log.info("Starting BMW test mode")
+        # This code is for testing purposes and will be removed in the future, as we want to run the application as a service without any output to the console
+        load_dotenv()  # Load environment variables from .env file
+
+        client_id = os.getenv("BMW_CLIENT_ID")
+        vin = os.getenv("BMW_VIN")
+
+        print("4. Refreshing token")
+        
+        # bmw = BMWCarDataService(db_service=None, vin=vin, client_id=client_id)
+        
+        # # test refreshing the access token using the refresh token
+        # # refresh_token = ""
+        # # refresh_token = """
+        # # refresh_response = bmw._dcf_refresh_access_token(refresh_token=refresh_token)
+        # # return
+    
+        # # test get the container-id
+        # token = ""
+        # container_id = bmw._get_container_id_by_name(access_token=token, container_name="i5_charging")
+        # container_data = bmw._get_container_data(access_token=token, container_id=container_id, vin=vin)
+        # print(container_data)
+        
+        # return
+
+        # print("1. Requesting BMW OAuth device code...")
+
+        # req = False
+
+        # if req:
+        #     url = "https://customer.bmwgroup.com/gcdm/oauth/device/code"
+        #     headers = {
+        #         "accept": "application/json",
+        #         "Content-Type": "application/x-www-form-urlencoded",
+        #     }
+        #     payload = {
+        #         "client_id": client_id,
+        #         "response_type": "device_code",
+        #         "scope": "authenticate_user openid cardata:api:read cardata:streaming:read",
+        #         "code_challenge": "",
+        #         "code_challenge_method": "S256",
+        #     }
+
+        #     response = requests.post(url, headers=headers, data=payload, timeout=30)
+            
+        #     user_code = response.json().get("user_code")
+        #     device_code = response.json().get("device_code")
+        #     verification_uri = response.json().get("verification_uri")
+            
+        #     print(f"1. BMW OAuth device code status: {response.status_code}")
+        #     print(response.text)
+
+        #     print(f"2. Please go to {verification_uri} and enter the user code: {user_code}")
+
+        #     response = requests.get(f"{verification_uri}?user_code={user_code}")
+        #     print(f"2. BMW Verification call: {response.status_code}")
+        #     print(response.text)
+        #     sleep(30)  # Wait for 30 seconds before requesting the access token, to give the user enough time to enter the code and authenticate the device
+        # else:
+        #     user_code = ""
+        #     device_code = ""
+
+        # print("3. Requesting BMW OAuth access token...")
+        # token_url = "https://customer.bmwgroup.com/gcdm/oauth/token"
+        # token_headers = {
+        #     "Content-Type": "application/x-www-form-urlencoded",
+        # }
+        # code_verifier = "" #random string
+        # token_payload = {
+        #     "client_id": client_id,
+        #     "device_code": device_code,
+        #     "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        #     "code_verifier": code_verifier,
+        # }
+        # token_response = requests.post(token_url, headers=token_headers, data=token_payload, timeout=30)
+        # print(f"3. BMW OAuth token status: {token_response.status_code}")
+        # print(token_response.text)
+        
+        # if token_response.status_code != 200:
+        #     print("try the refresh token")
+        #     return
+        
+        
+        # gcid = token_response.json().get("gcid")
+        # access_token = token_response.json().get("access_token")
+        # refresh_token = token_response.json().get("refresh_token")
+        # id_token = token_response.json().get("id_token")
+        
+        
+        
     elif not bypass_run:
         log.info("Starting EnergyManagementApplication")
         app = EnergyManagementApplication()
@@ -207,8 +302,13 @@ if __name__ in {"__main__", "__mp_main__"}:
     parser.add_argument(
         "--ui",
         action="store_true",
-        help="Start the user interface (not implemented yet)",
+        help="Start the user interface",
+    )
+    parser.add_argument(
+        "--bmw-test",
+        action="store_true",
+        help="Start the BMW test mode",
     )
 
     args = parser.parse_args()
-    main(bypass_run=args.bypass_run, start_ui=args.ui)
+    main(bypass_run=args.bypass_run, start_ui=args.ui, bmw_test=args.bmw_test)
