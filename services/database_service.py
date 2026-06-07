@@ -152,7 +152,8 @@ class DBService:
                 duration_minutes INTEGER,
                 energy_meter_start INTEGER NOT NULL,
                 energy_meter_end INTEGER,
-                energy_consumed_wh INTEGER
+                energy_consumed_wh INTEGER,
+                current_mileage_km INTEGER
             )
         ''')
         conn.commit()
@@ -226,6 +227,31 @@ class DBService:
         session_id = cursor.lastrowid
         conn.close()
         return session_id
+
+    def update_car_charging_entry_mileage(self, mileage_km: int):
+        """Update the mileage of a car charging entry in the database."""
+        conn = sqlite3.connect(self.db_path)
+        # get the last charging entry and update the mileage, if no value is present
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id FROM car_charging_report WHERE end_time IS NULL AND current_mileage_km IS NULL ORDER BY start_time DESC LIMIT 1
+        ''')
+        result = cursor.fetchone()
+        if result:
+            session_id = result[0]
+        else:
+            log.debug("No open car charging entry found to update mileage.")
+            conn.close()
+            return
+
+        log.debug(f"Updating mileage for car charging entry in database with session ID {session_id} to {mileage_km} km")
+        cursor.execute('''
+            UPDATE car_charging_report
+            SET current_mileage_km = ?
+            WHERE id = ?
+        ''', (mileage_km, session_id))
+        conn.commit()
+        conn.close()
 
     def end_car_charging_entry(self, session_id: int, energy_meter_end: int):
         """Update a car charging entry in the database when a charging session ends. It sets the end time, calculates the duration and energy consumed, and updates the entry."""

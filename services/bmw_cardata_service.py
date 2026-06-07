@@ -114,8 +114,7 @@ class BMWCarDataService:
 
     def _on_mqtt_message(self, client, userdata, msg: mqtt_client.MQTTMessage):
         """Callback function for handling incoming MQTT messages from the BMW CarData streaming API."""
-        # log.info(f"Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
-        print(f">>>>> Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
+        log.debug(f">>>>> Received MQTT message on topic {msg.topic}: {msg.payload.decode()}")
         # Here you can add code to process the incoming streaming data as needed.
         try:
             payload_json: dict = json.loads(msg.payload.decode())
@@ -126,10 +125,10 @@ class BMWCarDataService:
         
         data: dict = payload_json["data"]
         key: str | None = list(data.keys())[0] if data else None
-        print(f">>>> Extracted key from MQTT message: {key}")
+        log.debug(f">>>> Extracted key from MQTT message: {key}")
         values: dict | None = data[key] if key else None
         if isinstance(values, dict):
-            print(f">>>> Extracted values from MQTT message: {values}")
+            log.debug(f">>>> Extracted values from MQTT message: {values}")
             value = str(values.get("value", ""))
             unit = values.get("unit", None)
             bmw_message = BMWCardataMessage(
@@ -139,10 +138,13 @@ class BMWCarDataService:
                 unit=unit,
                 timestamp=datetime.now()
             )
-            print(f">>>> Created BMWCardataMessage: {bmw_message}")
+            log.debug(f">>>> Created BMWCardataMessage: {bmw_message}")
             self.db_service.create_bmw_cardata_message_entry(bmw_message)
+            
+            if key == "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange":
+                self.db_service.update_car_charging_entry_mileage(int(value))
         else:
-            print(f"!!!!! Values in MQTT message are not in expected format: {values}")
+            log.error(f"!!!!! Values in MQTT message are not in expected format: {values}")
 
     def run_mqtt_client(self):
         """Run the MQTT client loop to receive streaming data from the BMW CarData streaming API."""
