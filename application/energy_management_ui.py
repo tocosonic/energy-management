@@ -135,7 +135,18 @@ class EnergyManagementUI:
                     ui.label(f"{delta_fully_charged} {unit} (since {timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
                 else:
                     ui.label("n/a").style("font-size: 16px; margin-top: 0px;")
-                
+
+                ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                ui.label("Remaining range").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+                remaining_range_data = bmw_cardata_service.get_remaining_range()
+                if remaining_range_data is not None:
+                    remaining_range, unit, timestamp = remaining_range_data
+                else:
+                    remaining_range, unit, timestamp = None, None, None
+                if remaining_range is not None and unit is not None and timestamp is not None:
+                    ui.label(f"{int(remaining_range):,.0f} {unit} (since {timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
+                else:
+                    ui.label("n/a").style("font-size: 16px; margin-top: 0px;")                
             else:
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
                 ui.label("DCF Step 2").style("font-size: 16px; font-weight: bold; margin-top: 0px;")

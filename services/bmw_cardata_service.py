@@ -488,3 +488,18 @@ class BMWCarDataService:
         else:
             log.error(f"Battery delta fully charged not found in database for topic '{self.streaming_topic}' and key 'vehicle.drivetrain.electricEngine.charging.smeEnergyDeltaFullyCharged'.")
             return None
+
+    def get_remaining_range(self) -> tuple[int, str, datetime] | None:
+        """Get the remaining range of the car."""
+        msg = self.db_service.get_bmw_cardata_message_entry(self.streaming_topic, "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange")
+        if msg:
+            try:
+                value = int(msg.value)
+                unit = msg.unit
+                return value, unit, msg.timestamp
+            except ValueError as e:
+                log.error(f"Error converting remaining range value to int: {e}")
+                return None
+        else:
+            log.error(f"Remaining range not found in database for topic '{self.streaming_topic}' and key 'vehicle.drivetrain.electricEngine.kombiRemainingElectricRange'.")
+            return None
