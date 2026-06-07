@@ -13,3 +13,4 @@ Python application which reads energy production and consumption information and
 - `control_relays.py` was the first version of the energy controller without supporting an electric car charger.
 Now I've started to redesign everything and to support an electric car charger.
 - Version 1.0.0 is finished which comes along with a status UI.
+- More see https://github.com/tocosonic/energy-management/releases
