@@ -7,6 +7,7 @@ Python application which reads energy production and consumption information and
 - Weishaupt warm water heatpump (via SGready)
 - Panasonic J-series (via SGready)
 - Go-E Pro charger
+- BMW Cardata Service via MQTT
 
 ## Version history
 - `control_relays.py` was the first version of the energy controller without supporting an electric car charger.
