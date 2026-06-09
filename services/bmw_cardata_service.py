@@ -141,7 +141,7 @@ class BMWCarDataService:
             log.debug(f">>>> Created BMWCardataMessage: {bmw_message}")
             self.db_service.create_bmw_cardata_message_entry(bmw_message)
             
-            if key == "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange":
+            if key == "vehicle.vehicle.travelledDistance":
                 self.db_service.update_car_charging_entry_mileage(int(value))
         else:
             log.error(f"!!!!! Values in MQTT message are not in expected format: {values}")
