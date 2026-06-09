@@ -21,6 +21,7 @@ heating_heatpump_service = PanasonicAquareaService(db_service, int(os.getenv("RE
 bmw_cardata_service = BMWCarDataService(db_service=db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"), streaming_topic=os.getenv("BMW_STREAMING_TOPIC"))
 
 STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME"))
+GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL"))
 
 def request_token():
     token = bmw_cardata_service.dcf_step3_request_access_token()
@@ -231,11 +232,9 @@ class EnergyManagementUI:
             energy_production = sonnen_battery_service.get_energy_production() / 1000
             energy_consumption = sonnen_battery_service.get_energy_consumption() / 1000
             available_energy = sonnen_battery_service.get_grid_feed() / 1000
-            # available_energy_min = sonnen_battery_service.get_grid_feed_in_minimum(STOP_CAR_CHARGING_WAIT_TIME) / 1000
-            available_energy_avg = sonnen_battery_service.get_grid_feed_in_average(20) / 1000
+            available_energy_avg = sonnen_battery_service.get_grid_feed_in_average(GRID_FEED_IN_MOVING_AVERAGE_INTERVAL) / 1000
             
             ui.label(f"Production: {energy_production} kW").style("color: #666;")
             ui.label(f"Consumption: {energy_consumption} kW").style("color: #666;")
             ui.label(f"Available: {available_energy} kW").style("color: #666;")
-            # ui.label(f"Min. Available ({STOP_CAR_CHARGING_WAIT_TIME} min): {available_energy_min} kW").style("color: #666;")
-            ui.label(f"Avg. Available (20 min): {available_energy_avg:.3f} kW").style("color: #666;")
+            ui.label(f"Avg. Available ({GRID_FEED_IN_MOVING_AVERAGE_INTERVAL} min): {available_energy_avg:.3f} kW").style("color: #666;")
