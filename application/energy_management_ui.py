@@ -57,17 +57,17 @@ class EnergyManagementUI:
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Service status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             charging_status = db_service.get_goe_status()
-            ui.label(f"{charging_status.action.name} (since {charging_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{charging_status.action.label} (since {charging_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
 
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Charger status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             charger_status = goe_service.get_charger_status()
-            ui.label(f"{charger_status.name}").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{charger_status.label}").style("font-size: 16px; margin-top: 0px;")
 
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Car status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             car_status = goe_service.get_car_status()
-            ui.label(f"{car_status.name}").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{car_status.label}").style("font-size: 16px; margin-top: 0px;")
             
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Power").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
@@ -83,7 +83,7 @@ class EnergyManagementUI:
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Logic mode").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             logic_mode = goe_service.get_logic_mode()
-            ui.label(f"{logic_mode.name}").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{logic_mode.label}").style("font-size: 16px; margin-top: 0px;")
 
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Configured phases / current").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
@@ -95,7 +95,7 @@ class EnergyManagementUI:
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Charger error").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             charger_error = goe_service.get_error()
-            ui.label(f"{charger_error.name}").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{charger_error.label}").style("font-size: 16px; margin-top: 0px;")
             
             # Car Status
             ui.label("Car Status").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
@@ -181,14 +181,14 @@ class EnergyManagementUI:
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ww_status = db_service.get_heatpump_status_by_id(ww_heatpump_service.get_id())
-            ui.label(f"{ww_status.action.name} (since {ww_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{ww_status.action.label} (since {ww_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
         
             # Heating Heatpump
             ui.label(f"{heating_heatpump_service.name}").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             heating_status = db_service.get_heatpump_status_by_id(heating_heatpump_service.get_id())
-            ui.label(f"{heating_status.action.name} (since {heating_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{heating_status.action.label} (since {heating_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
             
         with ui.header(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
             ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")

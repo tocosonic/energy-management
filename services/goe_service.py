@@ -7,77 +7,101 @@ import time
 log = logging.getLogger(__name__)
 
 class CarStatus(Enum):
-    UNKNOWN_ERROR = 0
-    IDLE = 1
-    CHARGING = 2
-    WAIT_CAR = 3
-    COMPLETE = 4
-    ERROR = 5
+    UNKNOWN_ERROR = (0, "Unknown error")
+    IDLE = (1, "Idle")
+    CHARGING = (2, "Charging")
+    WAIT_CAR = (3, "Waiting for a car")
+    COMPLETE = (4, "Complete")
+    ERROR = (5, "Error")
+
+    def __new__(cls, value, label):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.label = label
+        return obj
 
 class ChargerStatus(Enum):
-    NotChargingBecauseNoChargeCtrlData=0
-    NotChargingBecauseOvertemperature=1
-    NotChargingBecauseAccessControlWait=2
-    ChargingBecauseForceStateOn=3
-    NotChargingBecauseForceStateOff=4
-    NotChargingBecauseScheduler=5
-    NotChargingBecauseEnergyLimit=6
-    ChargingBecauseAwattarPriceLow=7
-    ChargingBecauseAutomaticStopTestLadung=8
-    ChargingBecauseAutomaticStopNotEnoughTime=9
-    ChargingBecauseAutomaticStop=10
-    ChargingBecauseAutomaticStopNoClock=11
-    ChargingBecausePvSurplus=12
-    ChargingBecauseFallbackGoEDefault=13
-    ChargingBecauseFallbackGoEScheduler=14
-    ChargingBecauseFallbackDefault=15
-    NotChargingBecauseFallbackGoEAwattar=16
-    NotChargingBecauseFallbackAwattar=17
-    NotChargingBecauseFallbackAutomaticStop=18
-    ChargingBecauseCarCompatibilityKeepAlive=19
-    ChargingBecauseChargePauseNotAllowed=20
-    NotChargingBecauseSimulateUnplugging=22
-    NotChargingBecausePhaseSwitch=23
-    NotChargingBecauseMinPauseDuration=24
-    NotChargingBecauseError=26
-    NotChargingBecauseLoadManagementDoesntWant=27
-    NotChargingBecauseOcppDoesntWant=28
-    NotChargingBecauseReconnectDelay=29
-    NotChargingBecauseAdapterBlocking=30
-    NotChargingBecauseUnderfrequencyControl=31
-    NotChargingBecauseUnbalancedLoad=32
-    ChargingBecauseDischargingPvBattery=33
-    NotChargingBecauseGridMonitoring=34
-    NotChargingBecauseOcppFallback=35
+    NotChargingBecauseNoChargeCtrlData=(0, "Not charging because no charge control data")
+    NotChargingBecauseOvertemperature=(1, "Not charging because overtemperature")
+    NotChargingBecauseAccessControlWait=(2, "Not charging because access control wait")
+    ChargingBecauseForceStateOn=(3, "Charging because force state on")
+    NotChargingBecauseForceStateOff=(4, "Not charging because force state off")
+    NotChargingBecauseScheduler=(5, "Not charging because scheduler")
+    NotChargingBecauseEnergyLimit=(6, "Not charging because energy limit")
+    ChargingBecauseAwattarPriceLow=(7, "Charging because Awattar price low")
+    ChargingBecauseAutomaticStopTestLadung=(8, "Charging because automatic stop test loading")
+    ChargingBecauseAutomaticStopNotEnoughTime=(9, "Charging because automatic stop not enough time")
+    ChargingBecauseAutomaticStop=(10, "Charging because automatic stop")
+    ChargingBecauseAutomaticStopNoClock=(11, "Charging because automatic stop no clock")
+    ChargingBecausePvSurplus=(12, "Charging because PV surplus")
+    ChargingBecauseFallbackGoEDefault=(13, "Charging because fallback GoE default")
+    ChargingBecauseFallbackGoEScheduler=(14, "Charging because fallback GoE scheduler")
+    ChargingBecauseFallbackDefault=(15, "Charging because fallback default")
+    NotChargingBecauseFallbackGoEAwattar=(16, "Not charging because fallback GoE Awattar")
+    NotChargingBecauseFallbackAwattar=(17, "Not charging because fallback Awattar")
+    NotChargingBecauseFallbackAutomaticStop=(18, "Not charging because fallback automatic stop")
+    ChargingBecauseCarCompatibilityKeepAlive=(19, "Charging because car compatibility keep alive")
+    ChargingBecauseChargePauseNotAllowed=(20, "Charging because charge pause not allowed")
+    NotChargingBecauseSimulateUnplugging=(22, "Not charging because simulate unplugging")
+    NotChargingBecausePhaseSwitch=(23, "Not charging because phase switch")
+    NotChargingBecauseMinPauseDuration=(24, "Not charging because min pause duration")
+    NotChargingBecauseError=(26, "Not charging because of an error")
+    NotChargingBecauseLoadManagementDoesntWant=(27, "Not charging because load management doesn't want")
+    NotChargingBecauseOcppDoesntWant=(28, "Not charging because OCPP doesn't want")
+    NotChargingBecauseReconnectDelay=(29, "Not charging because reconnect delay")
+    NotChargingBecauseAdapterBlocking=(30, "Not charging because adapter blocking")
+    NotChargingBecauseUnderfrequencyControl=(31, "Not charging because underfrequency control")
+    NotChargingBecauseUnbalancedLoad=(32, "Not charging because unbalanced load")
+    ChargingBecauseDischargingPvBattery=(33, "charging because discharging PV battery")
+    NotChargingBecauseGridMonitoring=(34, "Not charging because grid monitoring")
+    NotChargingBecauseOcppFallback=(35, "Not charging because OCPP fallback")
+    
+    def __new__(cls, value, label):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.label = label
+        return obj
 
 class ChargerError(Enum):
-    NoError=0
-    FiAc=1
-    FiDc=2
-    Phase=3
-    Overvolt=4
-    Overamp=5
-    Diode=6
-    PpInvalid=7
-    GndInvalid=8
-    ContactorStuck=9
-    ContactorMiss=10
-    FiUnknown=11
-    Unknown=12
-    Overtemp=13
-    NoComm=14
-    StatusLockStuckOpen=15
-    StatusLockStuckLocked=16
-    Reserved20=20
-    Reserved21=21
-    Reserved22=22
-    Reserved23=23
-    Reserved24=24
+    NoError=(0, "No error")
+    FiAc=(1, "FI AC")
+    FiDc=(2, "FI DC")
+    Phase=(3, "Phase")
+    Overvolt=(4, "Overvolt")
+    Overamp=(5, "Overamp")
+    Diode=(6, "Diode")
+    PpInvalid=(7, "PP invalid")
+    GndInvalid=(8, "GND invalid")
+    ContactorStuck=(9, "Contactor stuck")
+    ContactorMiss=(10, "Contactor miss")
+    FiUnknown=(11, "FI unknown")
+    Unknown=(12, "Unknown")
+    Overtemp=(13, "Overtemperature")
+    NoComm=(14, "No Comm")
+    StatusLockStuckOpen=(15, "Status lock stuck open")
+    StatusLockStuckLocked=(16, "Status lock stuck locked")
+    Reserved20=(20, "Reserved 20")
+    Reserved21=(21, "Reserved 21")
+    Reserved22=(22, "Reserved 22")
+    Reserved23=(23, "Reserved 23")
+    Reserved24=(24, "Reserved 24")
+
+    def __new__(cls, value, label):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.label = label
+        return obj
 
 class LogicMode(Enum):
-    Default=3
-    EcoMode=4
-    AutomaticStop=5
+    Default=(3, "Default")
+    EcoMode=(4, "Eco mode")
+    AutomaticStop=(5, "Automatic stop")
+
+    def __new__(cls, value, label):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.label = label
+        return obj
 
 class GoEService:
     """Client for reading and updating charger state through the go-e API."""
