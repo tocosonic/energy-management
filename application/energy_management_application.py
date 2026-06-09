@@ -29,6 +29,7 @@ class ControlStructure:
     STOP_CAR_CHARGING_WAIT_TIME: int = 15
     NON_USED_ENERGY_BUFFER: int = 1000,  # Buffer in watts to account for fluctuations in energy production and consumption. This means that the application will only turn on devices if there is at least this much excess energy available, and will only turn off devices if the energy deficit is at least this much.
     GOE_USE_PV_SURPLUS: bool = False  # Whether to use the PV surplus available power reported by the GoE API to determine if there is enough excess energy available to turn on the car charging. If set to True, the application will use the PV surplus available power reported by the GoE API instead of the minimum grid feed-in value from the Sonnen battery to determine if there is enough excess energy available to turn on the car charging. This can be useful if the car charging is prioritized over other devices and you want to use the PV surplus available power to determine if there is enough excess energy available to turn on the car charging.
+    GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = 20 # The time interval in minutes for calculating the moving average of the grid feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the grid feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy.
 
 class EnergyManagementApplication:
     def __init__(self):
@@ -46,14 +47,15 @@ class EnergyManagementApplication:
     def _init_control_structure(self):
         """Initializes the control structure for the energy management application."""
         self.control_structure = ControlStructure(
-            START_WW_WAIT_TIME = int(os.getenv("START_WW_WAIT_TIME")),
-            START_HEATING_WAIT_TIME = int(os.getenv("START_HEATING_WAIT_TIME")),
-            START_CAR_CHARGING_WAIT_TIME = int(os.getenv("START_CAR_CHARGING_WAIT_TIME")),
-            STOP_WW_WAIT_TIME = int(os.getenv("STOP_WW_WAIT_TIME")),
-            STOP_HEATING_WAIT_TIME = int(os.getenv("STOP_HEATING_WAIT_TIME")),
-            STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME")),
-            NON_USED_ENERGY_BUFFER = int(os.getenv("NON_USED_ENERGY_BUFFER")),
-            GOE_USE_PV_SURPLUS = os.getenv("GOE_USE_PV_SURPLUS", "false").lower() == "true"
+            START_WW_WAIT_TIME = int(os.getenv("START_WW_WAIT_TIME", 5)),
+            START_HEATING_WAIT_TIME = int(os.getenv("START_HEATING_WAIT_TIME", 5)),
+            START_CAR_CHARGING_WAIT_TIME = int(os.getenv("START_CAR_CHARGING_WAIT_TIME", 5)),
+            STOP_WW_WAIT_TIME = int(os.getenv("STOP_WW_WAIT_TIME", 15)),
+            STOP_HEATING_WAIT_TIME = int(os.getenv("STOP_HEATING_WAIT_TIME", 10)),
+            STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME", 15)),
+            NON_USED_ENERGY_BUFFER = int(os.getenv("NON_USED_ENERGY_BUFFER", 1000)),
+            GOE_USE_PV_SURPLUS = os.getenv("GOE_USE_PV_SURPLUS", "false").lower() == "true",
+            GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL", 20))
         )
 
     def run(self):
@@ -177,7 +179,6 @@ class EnergyManagementApplication:
         if self.goe_service.is_car_charging_allowed() or self.goe_service.is_car_charging() or self.goe_service.is_car_charging_complete() or self.db_service.get_goe_status() in [ChargerAction.REQUEST_STOP_CHARGING, ChargerAction.REQUEST_DYNAMIC_CHARGING, ChargerAction.REQUEST_MAX_CHARGING]:
             log.debug(f"Car charging is currently allowed or the car is charging or charging was completed.")
 
-            # TODO build a real solution using MQTT streaming; there is a 50 API calls/day limit for the GoE API, so we cannot call the API multiple times in a short time period to check the car status
             car_reports_complete = self.goe_service.is_car_charging_complete()
             car_battery_charge_level = 70 # set to 70% as a default value to avoid that the car charging is turned off due to the missing battery charge level information
             if car_reports_complete:
@@ -201,9 +202,7 @@ class EnergyManagementApplication:
                 self.sonnen_battery_service.set_enable_discharge()
                 
                 # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
-                # min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(2) # self.control_structure.START_CAR_CHARGING_WAIT_TIME
-                min_power = self.sonnen_battery_service.get_grid_feed_in_average(10)
-                # consumed_power = self.goe_service.get_total_power_average() # self.goe_service.get_current_charging_power()
+                min_power = self.sonnen_battery_service.get_grid_feed_in_average(self.control_structure.GRID_FEED_IN_MOVING_AVERAGE_INTERVAL)
                 # take the real power as measured by the energy meter
                 consumed_power = self.energy_meter.get_current_power_w()
                 battery_feed_in = self.sonnen_battery_service.get_battery_feed()
