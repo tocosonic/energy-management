@@ -232,10 +232,10 @@ class EnergyManagementUI:
             energy_consumption = sonnen_battery_service.get_energy_consumption() / 1000
             available_energy = sonnen_battery_service.get_grid_feed() / 1000
             # available_energy_min = sonnen_battery_service.get_grid_feed_in_minimum(STOP_CAR_CHARGING_WAIT_TIME) / 1000
-            available_energy_avg = sonnen_battery_service.get_grid_feed_in_average(10) / 1000
+            available_energy_avg = sonnen_battery_service.get_grid_feed_in_average(20) / 1000
             
             ui.label(f"Production: {energy_production} kW").style("color: #666;")
             ui.label(f"Consumption: {energy_consumption} kW").style("color: #666;")
             ui.label(f"Available: {available_energy} kW").style("color: #666;")
             # ui.label(f"Min. Available ({STOP_CAR_CHARGING_WAIT_TIME} min): {available_energy_min} kW").style("color: #666;")
-            ui.label(f"Avg. Available (10 min): {available_energy_avg:.3f} kW").style("color: #666;")
+            ui.label(f"Avg. Available (20 min): {available_energy_avg:.3f} kW").style("color: #666;")

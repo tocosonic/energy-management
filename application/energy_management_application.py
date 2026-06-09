@@ -202,7 +202,7 @@ class EnergyManagementApplication:
                 
                 # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
                 # min_power = self.sonnen_battery_service.get_grid_feed_in_minimum(2) # self.control_structure.START_CAR_CHARGING_WAIT_TIME
-                min_power = self.sonnen_battery_service.get_grid_feed_in_average(10)
+                min_power = self.sonnen_battery_service.get_grid_feed_in_average(20)
                 # consumed_power = self.goe_service.get_total_power_average() # self.goe_service.get_current_charging_power()
                 # take the real power as measured by the energy meter
                 consumed_power = self.energy_meter.get_current_power_w()
