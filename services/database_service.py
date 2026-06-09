@@ -7,22 +7,34 @@ from datetime import datetime, timedelta
 log = logging.getLogger(__name__)
 
 class ChargerAction(Enum):
-    NO_ACTION = 0
-    REQUEST_DYNAMIC_CHARGING = 1
-    REQUEST_MAX_CHARGING = 2
-    DYNAMIC_CHARGING = 3
-    MAX_CHARGING = 4
-    REQUEST_STOP_CHARGING = 5
-    CHARGING_STOPPED = 6
-    SURPLUS_CHARGING = 7
-    REQUEST_SURPLUS_CHARGING = 8
+    NO_ACTION = (0, "No action")
+    REQUEST_DYNAMIC_CHARGING = (1, "Request dynamic charging")
+    REQUEST_MAX_CHARGING = (2, "Request max charging")
+    DYNAMIC_CHARGING = (3, "Dynamic charging")
+    MAX_CHARGING = (4, "Max charging")
+    REQUEST_STOP_CHARGING = (5, "Request stop charging")
+    CHARGING_STOPPED = (6, "Charging stopped")
+    SURPLUS_CHARGING = (7, "Surplus charging")
+    REQUEST_SURPLUS_CHARGING = (8, "Request surplus charging")
+    
+    def __new__(cls, value, label):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.label = label
+        return obj
 
 class HeatpumpAction(Enum):
-    NO_ACTION = 0
-    REQUEST_HEATPUMP_ON = 1
-    REQUEST_HEATPUMP_OFF = 2
-    HEATPUMP_ON = 3
-    HEATPUMP_OFF = 4
+    NO_ACTION = (0, "No action")
+    REQUEST_HEATPUMP_ON = (1, "Request heatpump on")
+    REQUEST_HEATPUMP_OFF = (2, "Request heatpump off")
+    HEATPUMP_ON = (3, "Heatpump on")
+    HEATPUMP_OFF = (4, "Heatpump off")
+    
+    def __new__(cls, value, label):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.label = label
+        return obj
 
 class BMWCardataAuthKeys(Enum):
     USER_CODE = (0, "user_code")
@@ -33,9 +45,12 @@ class BMWCardataAuthKeys(Enum):
     REFRESH_TOKEN = (5, "refresh_token")
     ID_TOKEN = (6, "id_token")
     
-    def __init__(self, id, key):
-        self.id = id
-        self.key = key
+    def __new__(cls, id, key):
+        obj = object.__new__(cls)
+        obj._value_ = id
+        obj.id = id
+        obj.key = key
+        return obj
 
 @dataclass(frozen=True)
 class EnergyStatus:
