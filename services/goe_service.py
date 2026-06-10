@@ -305,9 +305,10 @@ class GoEService:
         Returns:
             The current effective charging power in watts.
         """
-        if self.is_car_charging():
-            return self.get_configured_charging_power()
-        return 0
+        power_w = self._get_status("wo")
+        if power_w is None:
+            return 0
+        return int(float(power_w))
 
     def get_total_power_average(self) -> int:
         """The 30 seconds total average power in W as reported by the charger.
@@ -317,6 +318,15 @@ class GoEService:
         tpa = self._get_status("tpa")
         # API values can arrive as numeric strings (e.g. "1234.0") or numbers.
         return int(float(tpa))
+
+    def get_total_energy(self) -> int:
+        """The total energy delivered in Wh as reported by the charger.
+        Returns:
+            The total energy delivered in Wh
+        """
+        eto = self._get_status("eto")
+        # API values can arrive as numeric strings (e.g. "1234.0") or numbers.
+        return int(eto)
 
     def _get_status(self, filter):
         """Get a single status value from the charger API.
