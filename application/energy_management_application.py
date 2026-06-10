@@ -37,8 +37,13 @@ class EnergyManagementApplication:
         self.db_service = DBService(db_path=os.getenv("DATABASE_PATH"), energy_status_retention_minutes=int(os.getenv("SONNEN_ENERGY_STATUS_RETENTION")))
         self.weather_service = WeatherService(api_key=os.getenv("OPENWEATHER_API_KEY"), latitude=os.getenv("OPENWEATHER_LAT"), longitude=os.getenv("OPENWEATHER_LON"))
         self.sonnen_battery_service = SonnenBatteryService(self.db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
-        self.warm_water_heatpump_service = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heatpump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
-        self.heating_heatpump_service = PanasonicAquareaService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
+        self.is_warm_water_heatpump_enabled = os.getenv("RELAY_PIN_WW", "false").lower() == "true"
+        if self.is_warm_water_heatpump_enabled:
+            self.warm_water_heatpump_service = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heatpump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
+        
+        self.is_heating_heatpump_enabled = os.getenv("RELAY_PIN_HEATING1", "false").lower() == "true" or os.getenv("RELAY_PIN_HEATING2", "false").lower() == "true"
+        if self.is_heating_heatpump_enabled:
+            self.heating_heatpump_service = PanasonicAquareaService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
         self.goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
         self.energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
         self.bmw_cardata_service = BMWCarDataService(db_service=self.db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"), streaming_user=os.getenv("BMW_STREAMING_USER"), streaming_topic=os.getenv("BMW_STREAMING_TOPIC"))
@@ -79,8 +84,10 @@ class EnergyManagementApplication:
             car_charging = self.energy_meter.get_current_power_w()
             self.sonnen_battery_service.refresh_status(car_charging=car_charging)
 
-            self.update_heatpump(self.heating_heatpump_service, self.control_structure.START_HEATING_WAIT_TIME, self.control_structure.STOP_HEATING_WAIT_TIME)
-            self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)
+            if self.is_heating_heatpump_enabled:
+                self.update_heatpump(self.heating_heatpump_service, self.control_structure.START_HEATING_WAIT_TIME, self.control_structure.STOP_HEATING_WAIT_TIME)
+            if self.is_warm_water_heatpump_enabled:
+                self.update_heatpump(self.warm_water_heatpump_service, self.control_structure.START_WW_WAIT_TIME, self.control_structure.STOP_WW_WAIT_TIME)
 
             self.update_car_charging()
 
