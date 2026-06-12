@@ -4,8 +4,7 @@ Since version 1.3.0 this application is fully operational (since a couple of day
 
 Other than that it appeared to me that Go-E's implementation of PV surplus charging seems to be somehow unpredictable (at least the action taken by this charger when simply provided with the amount of power available at the moment was delayed and/or unpredictable by me. That's why I relied on my own implementation).
 
-<img width="594" height="1157" alt="image" src="https://github.com/user-attachments/assets/44857706-4176-4c8c-b692-514ffdd19ca4" />
-
+<img width="700" height="1272" alt="image" src="https://github.com/user-attachments/assets/34764bc1-085d-4254-b5b7-db221137f404" />
 
 ## Supported gears
 - RaspberryPI relay board
