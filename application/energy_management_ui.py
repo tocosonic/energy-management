@@ -22,6 +22,7 @@ bmw_cardata_service = BMWCarDataService(db_service=db_service, vin=os.getenv("BM
 
 STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME"))
 GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL"))
+BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL"))
 
 def request_token():
     token = bmw_cardata_service.dcf_step3_request_access_token()
@@ -193,32 +194,42 @@ class EnergyManagementUI:
         with ui.header(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
             ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
             
-            energy_status = db_service.get_energy_status_time_series(120)  # Get energy status for the last 60 minutes
-            available_power_w = sonnen_battery_service.get_available_power_time_series(120, moving_average_interval=30) # GRID_FEED_IN_MOVING_AVERAGE_INTERVAL
+            energy_status = sonnen_battery_service.get_energy_status_with_available_power_time_series(120, moving_average_interval=GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, battery_average_interval=5)
             if energy_status:
                 # get list of production values from energy_status
                 timestamps = [status.timestamp for status in energy_status]
                 energy_productions = [status.production / 1000 for status in energy_status]
                 energy_consumptions = [status.consumption / 1000 for status in energy_status]
-                energy_feed_ins = [status.feed_in / 1000 for status in energy_status]
-                battery_feed_ins = [status.battery_feed_in / 1000 for status in energy_status]
+                energy_feed_in = [status.feed_in / 1000 for status in energy_status]
+                battery_feed_in = [status.battery_feed_in / 1000 for status in energy_status]
+                avg_battery_feed_in = [status.average_battery_feed_in / 1000 for status in energy_status]
                 car_charging = [(status.car_charging or 0) / 1000 for status in energy_status]
-                available_power = [power / 1000 for power in available_power_w]
+                available_power = [status.average_available_power / 1000 for status in energy_status]
 
                 fig = {
                     "data": [
                         {"x": timestamps, "y": energy_productions, "type": "line", "name": "Prod.", "line": {"color": "#f3cf03"}},
                         {"x": timestamps, "y": energy_consumptions, "type": "line", "name": "Cons.", "line": {"color": "#4355fab7"}},
-                        {"x": timestamps, "y": energy_feed_ins, "type": "line", "name": "Feed-in", "line": {"color": "#505050"}},
-                        {"x": timestamps, "y": battery_feed_ins, "type": "line", "name": "Battery", "line": {"color": "#50d81b"}},
+                        {"x": timestamps, "y": energy_feed_in, "type": "line", "name": "Feed-in", "line": {"color": "#505050"}},
+                        {"x": timestamps, "y": battery_feed_in, "type": "line", "name": "Battery", "line": {"color": "#50d81b"}},
+                        {"x": timestamps, "y": avg_battery_feed_in, "type": "line", "name": "Avg. B.", "line": {"color": "rgba(93, 217, 109, 0.3)"}}, # {"color": "#53cf2263"}},
                         {"x": timestamps, "y": car_charging, "type": "line", "name": "Car", "line": {"color": "#ff6600"}},
-                        {"x": timestamps, "y": available_power, "type": "line", "name": "Avg. Avl.", "line": {"color": "rgba(202, 202, 201, 0.5)"}},
+                        {"x": timestamps, "y": available_power, "type": "line", "name": "Avg. Avl.", "line": {"color": "rgba(202, 202, 201, 0.9)"}},
                     ],
                     "layout": {
-                        "margin": {"t": 0, "r": 0, "b": 18, "l": 40},
+                        "margin": {"t": 0, "r": 0, "b": 14, "l": 40},
                         "plot_bgcolor": "#f8f8f8",
                         "paper_bgcolor": "#f0f0f0",
-                        "yaxis": {"title": {"text": "Power (kW)"}}
+                        "xaxis": {
+                            "tickfont": {"size": 10}
+                        },
+                        "yaxis": {
+                            "title": {"text": "Power (kW)", "font": {"size": 10}},
+                            "tickfont": {"size": 10}
+                        },
+                        "legend": {
+                            "font": {"size": 10}
+                        }
                     },
                     "config": {
                         "staticPlot": True,
@@ -226,7 +237,7 @@ class EnergyManagementUI:
                         "displaylogo": False
                     }
                 }
-                ui.plotly(fig).style("width: 100%; height: 136px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
+                ui.plotly(fig).style("width: 100%; height: 156px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
             else:
                 ui.label("No energy data available").style("color: #666;")
             
@@ -237,7 +248,7 @@ class EnergyManagementUI:
             available_energy = sonnen_battery_service.get_grid_feed() / 1000
             available_energy_avg = sonnen_battery_service.get_grid_feed_in_average(GRID_FEED_IN_MOVING_AVERAGE_INTERVAL) / 1000
             
-            ui.label(f"Production: {energy_production} kW").style("color: #666;")
-            ui.label(f"Consumption: {energy_consumption} kW").style("color: #666;")
-            ui.label(f"Grid feed-in: {available_energy} kW").style("color: #666;")
-            ui.label(f"Avg. grid feed-in ({GRID_FEED_IN_MOVING_AVERAGE_INTERVAL} min): {available_energy_avg:.3f} kW").style("color: #666;")
+            ui.label(f"Production: {energy_production} kW").style("color: #666;font-size: 10pt;")
+            ui.label(f"Consumption: {energy_consumption} kW").style("color: #666;font-size: 10pt;")
+            ui.label(f"Grid feed-in: {available_energy} kW").style("color: #666;font-size: 10pt;")
+            ui.label(f"Avg. grid feed-in ({GRID_FEED_IN_MOVING_AVERAGE_INTERVAL} min): {available_energy_avg:.3f} kW").style("color: #666;font-size: 10pt;")
