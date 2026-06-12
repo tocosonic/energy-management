@@ -301,12 +301,12 @@ class DBService:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT action FROM goe_action LIMIT 1
+            SELECT action, session_id FROM goe_action LIMIT 1
         ''')
         existing = cursor.fetchone()
 
         # If this action is already active, keep the original timestamp.
-        if existing and existing[0] == action.value and not force_create:
+        if existing and existing[0] == action.value and (not force_create or existing[1] is None):
             conn.close()
             return action
 
@@ -591,11 +591,11 @@ class DBService:
             SELECT timestamp, production, consumption, feed_in, battery_feed_in, car_charging
             FROM energy_status
             WHERE timestamp >= ?
-            ORDER BY timestamp DESC
+            ORDER BY timestamp ASC
         ''', (cutoff_time,))
         rows = cursor.fetchall()
         conn.close()
-        return [
+        series = [
             EnergyStatus(
                 timestamp=row[0],
                 production=row[1],
@@ -606,6 +606,7 @@ class DBService:
             )
             for row in rows
         ]
+        return series[-minutes:]  # Return only the last 'minutes' entries to limit the size of the returned data
         
     def _clean_up_old_energy_status(self, minutes: int):
         """Delete energy status entries that are older than the specified number of minutes."""

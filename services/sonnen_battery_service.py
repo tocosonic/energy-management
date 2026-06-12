@@ -1,10 +1,16 @@
 import logging
 import json
 import requests
+from dataclasses import dataclass
 
 from services.database_service import DBService, EnergyStatus
 
 log = logging.getLogger(__name__)
+
+@dataclass(frozen=True)
+class EnergyStatusWithAverageAvailablePower(EnergyStatus):
+    average_available_power: int | None
+    average_battery_feed_in: int | None
 
 class SonnenBatteryService:
     def __init__(self, db_service: DBService, host, port, api_key):
@@ -50,33 +56,49 @@ class SonnenBatteryService:
     def refresh_status(self, car_charging: int = None, update_db: bool = True):
         self._query_status(car_charging, update_db)
 
-    def get_available_power_time_series(self, minutes: int, moving_average_interval: int) -> list[int]:
-        """ Get a time series of available power values (in W) for the last specified number of minutes,
-            which can be calculated based on the energy production, energy consumption, and grid feed-in values.
-            The available power can be calculated as: available_power = grid-feed-in + power consumed by the car charger + power fed into the battery (charging).
-        """
-        time_series = self.get_energy_status_time_series(minutes + moving_average_interval)
+    def get_energy_status_with_available_power_time_series(self, minutes: int, moving_average_interval: int, battery_average_interval: int) -> list[EnergyStatusWithAverageAvailablePower]:
+        """Get a time series of energy status values with average available power for the last specified number of minutes."""
+        energy_status_series = self.get_energy_status_time_series(minutes + moving_average_interval)
 
-        feed_in_series = [entry.feed_in for entry in time_series]
+        feed_in_series = [entry.feed_in for entry in energy_status_series]
+        battery_feed_in_series = [entry.battery_feed_in for entry in energy_status_series]
+
         interval = max(1, moving_average_interval)
-        available_power_series = []
+        interval_battery = max(1, battery_average_interval)
+        
+        start_idx = max(0, len(energy_status_series) - minutes)
+        end_idx = len(energy_status_series)
 
-        start_idx = max(0, len(time_series) - minutes)
-        end_idx = len(time_series)
-
+        energy_status_with_available_power_series = []
         for idx in range(start_idx, end_idx):
+            energy_status = energy_status_series[idx]
+            
             window_start_idx = max(0, idx - interval + 1)
             feed_in_window = feed_in_series[window_start_idx:idx + 1]
+            
+            battery_window_start_idx = max(0, idx - interval_battery + 1)
+            battery_feed_in_window = battery_feed_in_series[battery_window_start_idx:idx + 1]
 
-            smoothed_feed_in = int(sum(feed_in_window) / len(feed_in_window))
-            available_power = smoothed_feed_in + (time_series[idx].car_charging or 0) + time_series[idx].battery_feed_in
-            available_power_series.append(available_power)
+            smoothed_feed_in = int(sum(feed_in_window) / len(feed_in_window)) if feed_in_window else 0
+            smoothed_battery_feed_in = int(sum(battery_feed_in_window) / len(battery_feed_in_window)) if battery_feed_in_window else 0
+            adjusted_battery_feed_in = smoothed_battery_feed_in if smoothed_battery_feed_in <= 0 else int((3.0 * smoothed_battery_feed_in) / 4.0)
+            average_available_power = smoothed_feed_in + (energy_status.car_charging or 0) + adjusted_battery_feed_in
 
-        log.debug(
-            f"Available power time series for the last {minutes} minutes "
-            f"(moving average interval: {interval}): {available_power_series}"
-        )
-        return available_power_series
+            energy_status_with_available_power_series.append(
+                EnergyStatusWithAverageAvailablePower(
+                    timestamp=energy_status.timestamp,
+                    production=energy_status.production,
+                    consumption=energy_status.consumption,
+                    feed_in=energy_status.feed_in,
+                    battery_feed_in=energy_status.battery_feed_in,
+                    car_charging=energy_status.car_charging,
+                    average_available_power=average_available_power,
+                    average_battery_feed_in=smoothed_battery_feed_in
+                )
+            )
+
+        log.debug(f"Energy status with average available power time series for the last {minutes} minutes: {[entry.average_available_power for entry in energy_status_with_available_power_series]}")
+        return energy_status_with_available_power_series
 
     def get_energy_status_time_series(self, minutes: int) -> list[EnergyStatus]:
         """Get a time series of energy status values for the last specified number of minutes."""
@@ -91,7 +113,7 @@ class SonnenBatteryService:
         """Get the average grid feed-in value in W for the last specified number of minutes."""
         time_series = self.get_energy_status_time_series(minutes)
         avg = int(sum(entry.feed_in for entry in time_series) / len(time_series) if time_series else 0)
-        log.info(f"Grid feed-in time series for the last {minutes} minutes: {[entry.feed_in for entry in time_series]}; average: {avg} W")
+        log.debug(f"Grid feed-in time series for the last {minutes} minutes: {[entry.feed_in for entry in time_series]}; average: {avg} W")
         return avg
 
     # Status of the Sonnen battery as JSON structure. This includes the current battery level, energy production, and energy consumption.
