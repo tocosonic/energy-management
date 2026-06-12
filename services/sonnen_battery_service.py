@@ -50,6 +50,34 @@ class SonnenBatteryService:
     def refresh_status(self, car_charging: int = None, update_db: bool = True):
         self._query_status(car_charging, update_db)
 
+    def get_available_power_time_series(self, minutes: int, moving_average_interval: int) -> list[int]:
+        """ Get a time series of available power values (in W) for the last specified number of minutes,
+            which can be calculated based on the energy production, energy consumption, and grid feed-in values.
+            The available power can be calculated as: available_power = grid-feed-in + power consumed by the car charger + power fed into the battery (charging).
+        """
+        time_series = self.get_energy_status_time_series(minutes + moving_average_interval)
+
+        feed_in_series = [entry.feed_in for entry in time_series]
+        interval = max(1, moving_average_interval)
+        available_power_series = []
+
+        start_idx = max(0, len(time_series) - minutes)
+        end_idx = len(time_series)
+
+        for idx in range(start_idx, end_idx):
+            window_start_idx = max(0, idx - interval + 1)
+            feed_in_window = feed_in_series[window_start_idx:idx + 1]
+
+            smoothed_feed_in = int(sum(feed_in_window) / len(feed_in_window))
+            available_power = smoothed_feed_in + (time_series[idx].car_charging or 0) + time_series[idx].battery_feed_in
+            available_power_series.append(available_power)
+
+        log.debug(
+            f"Available power time series for the last {minutes} minutes "
+            f"(moving average interval: {interval}): {available_power_series}"
+        )
+        return available_power_series
+
     def get_energy_status_time_series(self, minutes: int) -> list[EnergyStatus]:
         """Get a time series of energy status values for the last specified number of minutes."""
         return self.db_service.get_energy_status_time_series(minutes)
@@ -60,9 +88,11 @@ class SonnenBatteryService:
         return min(entry.feed_in for entry in time_series)
 
     def get_grid_feed_in_average(self, minutes: int) -> int:
-        """Get the average grid feed-in value for the last specified number of minutes."""
+        """Get the average grid feed-in value in W for the last specified number of minutes."""
         time_series = self.get_energy_status_time_series(minutes)
-        return int(sum(entry.feed_in for entry in time_series) / len(time_series) if time_series else 0)
+        avg = int(sum(entry.feed_in for entry in time_series) / len(time_series) if time_series else 0)
+        log.info(f"Grid feed-in time series for the last {minutes} minutes: {[entry.feed_in for entry in time_series]}; average: {avg} W")
+        return avg
 
     # Status of the Sonnen battery as JSON structure. This includes the current battery level, energy production, and energy consumption.
     def get_battery_status(self) -> json:

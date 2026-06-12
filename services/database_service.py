@@ -595,7 +595,6 @@ class DBService:
         ''', (cutoff_time,))
         rows = cursor.fetchall()
         conn.close()
-
         return [
             EnergyStatus(
                 timestamp=row[0],
