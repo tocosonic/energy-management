@@ -194,6 +194,7 @@ class EnergyManagementUI:
             ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
             
             energy_status = db_service.get_energy_status_time_series(120)  # Get energy status for the last 60 minutes
+            available_power_w = sonnen_battery_service.get_available_power_time_series(120, moving_average_interval=30) # GRID_FEED_IN_MOVING_AVERAGE_INTERVAL
             if energy_status:
                 # get list of production values from energy_status
                 timestamps = [status.timestamp for status in energy_status]
@@ -202,14 +203,16 @@ class EnergyManagementUI:
                 energy_feed_ins = [status.feed_in / 1000 for status in energy_status]
                 battery_feed_ins = [status.battery_feed_in / 1000 for status in energy_status]
                 car_charging = [(status.car_charging or 0) / 1000 for status in energy_status]
-                
+                available_power = [power / 1000 for power in available_power_w]
+
                 fig = {
                     "data": [
                         {"x": timestamps, "y": energy_productions, "type": "line", "name": "Prod.", "line": {"color": "#f3cf03"}},
                         {"x": timestamps, "y": energy_consumptions, "type": "line", "name": "Cons.", "line": {"color": "#4355fab7"}},
-                        {"x": timestamps, "y": energy_feed_ins, "type": "line", "name": "Avail.", "line": {"color": "#505050"}},
+                        {"x": timestamps, "y": energy_feed_ins, "type": "line", "name": "Feed-in", "line": {"color": "#505050"}},
                         {"x": timestamps, "y": battery_feed_ins, "type": "line", "name": "Battery", "line": {"color": "#50d81b"}},
-                        {"x": timestamps, "y": car_charging, "type": "line", "name": "Car", "line": {"color": "red"}},
+                        {"x": timestamps, "y": car_charging, "type": "line", "name": "Car", "line": {"color": "#ff6600"}},
+                        {"x": timestamps, "y": available_power, "type": "line", "name": "Avg. Avl.", "line": {"color": "rgba(202, 202, 201, 0.5)"}},
                     ],
                     "layout": {
                         "margin": {"t": 0, "r": 0, "b": 18, "l": 40},
@@ -223,7 +226,7 @@ class EnergyManagementUI:
                         "displaylogo": False
                     }
                 }
-                ui.plotly(fig).style("width: 100%; height: 130px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
+                ui.plotly(fig).style("width: 100%; height: 136px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
             else:
                 ui.label("No energy data available").style("color: #666;")
             
@@ -236,5 +239,5 @@ class EnergyManagementUI:
             
             ui.label(f"Production: {energy_production} kW").style("color: #666;")
             ui.label(f"Consumption: {energy_consumption} kW").style("color: #666;")
-            ui.label(f"Available: {available_energy} kW").style("color: #666;")
-            ui.label(f"Avg. Available ({GRID_FEED_IN_MOVING_AVERAGE_INTERVAL} min): {available_energy_avg:.3f} kW").style("color: #666;")
+            ui.label(f"Grid feed-in: {available_energy} kW").style("color: #666;")
+            ui.label(f"Avg. grid feed-in ({GRID_FEED_IN_MOVING_AVERAGE_INTERVAL} min): {available_energy_avg:.3f} kW").style("color: #666;")
