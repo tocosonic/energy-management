@@ -39,11 +39,11 @@ class EnergyManagementApplication:
         self.db_service = DBService(db_path=os.getenv("DATABASE_PATH"), energy_status_retention_minutes=int(os.getenv("SONNEN_ENERGY_STATUS_RETENTION")))
         self.weather_service = WeatherService(api_key=os.getenv("OPENWEATHER_API_KEY"), latitude=os.getenv("OPENWEATHER_LAT"), longitude=os.getenv("OPENWEATHER_LON"))
         self.sonnen_battery_service = SonnenBatteryService(self.db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"), non_used_energy_buffer=int(os.getenv("NON_USED_ENERGY_BUFFER", 500)))
-        self.is_warm_water_heatpump_enabled = os.getenv("RELAY_PIN_WW", "false").lower() == "true"
+        self.is_warm_water_heatpump_enabled = os.getenv("RELAY_PIN_WW", "false").lower() != "false"
         if self.is_warm_water_heatpump_enabled:
             self.warm_water_heatpump_service = SGReadyDeviceService(self.db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heatpump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
         
-        self.is_heating_heatpump_enabled = os.getenv("RELAY_PIN_HEATING1", "false").lower() == "true" or os.getenv("RELAY_PIN_HEATING2", "false").lower() == "true"
+        self.is_heating_heatpump_enabled = os.getenv("RELAY_PIN_HEATING1", "false").lower() != "false" or os.getenv("RELAY_PIN_HEATING2", "false").lower() != "false"
         if self.is_heating_heatpump_enabled:
             self.heating_heatpump_service = PanasonicAquareaService(self.db_service, int(os.getenv("RELAY_PIN_HEATING1")), int(os.getenv("RELAY_PIN_HEATING2")), "Panasonic Heating Heatpump", int(os.getenv("HEATING1_ENERGY_CONSUMPTION")), int(os.getenv("HEATING2_ENERGY_CONSUMPTION")))
         self.goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))

@@ -231,7 +231,7 @@ class EnergyManagementUI:
                             "tickfont": {"size": 10}
                         },
                         "legend": {
-                            "font": {"size": 10}
+                            "font": {"size": 10},
                         }
                     },
                     "config": {
