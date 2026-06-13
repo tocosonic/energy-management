@@ -30,7 +30,9 @@ class ControlStructure:
     NON_USED_ENERGY_BUFFER: int = 1000  # Buffer in watts to account for fluctuations in energy production and consumption. This means that the application will only turn on devices if there is at least this much excess energy available, and will only turn off devices if the energy deficit is at least this much.
     GOE_USE_PV_SURPLUS: bool = False  # Whether to use the PV surplus available power reported by the GoE API to determine if there is enough excess energy available to turn on the car charging. If set to True, the application will use the PV surplus available power reported by the GoE API instead of the minimum grid feed-in value from the Sonnen battery to determine if there is enough excess energy available to turn on the car charging. This can be useful if the car charging is prioritized over other devices and you want to use the PV surplus available power to determine if there is enough excess energy available to turn on the car charging.
     GRID_FEED_IN_MOVING_AVERAGE_INTERVAL: int = 20 # The time interval in minutes for calculating the moving average of the grid feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the grid feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy.
-    BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL: int = 5 # The time interval in minutes for calculating the moving average of the battery feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the battery feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy, especially for car charging where we want to avoid rapidly turning on and off the car charging due to fluctuations in the battery feed-in.   
+    BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL: int = 5 # The time interval in minutes for calculating the moving average of the battery feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the battery feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy, especially for car charging where we want to avoid rapidly turning on and off the car charging due to fluctuations in the battery feed-in.
+    CAR_CHARGING_MOVING_AVERAGE_INTERVAL: int = 5 # The time interval in minutes for calculating the moving average of the car charging power. This can be used to smooth out fluctuations in the car charging power and make more stable decisions about when to turn on or off the car charging based on the available excess energy, especially for car charging where we want to avoid rapidly turning on and off the car charging due to fluctuations in the car charging power.
+    
 class EnergyManagementApplication:
     def __init__(self):
         load_dotenv()  # Load environment variables from .env file
@@ -61,7 +63,8 @@ class EnergyManagementApplication:
             NON_USED_ENERGY_BUFFER = int(os.getenv("NON_USED_ENERGY_BUFFER", 500)),
             GOE_USE_PV_SURPLUS = os.getenv("GOE_USE_PV_SURPLUS", "false").lower() == "true",
             GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL", 20)),
-            BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL", 5))
+            BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL", 5)),
+            CAR_CHARGING_MOVING_AVERAGE_INTERVAL = int(os.getenv("CAR_CHARGING_MOVING_AVERAGE_INTERVAL", 5))
         )
 
     def run(self):
@@ -209,21 +212,21 @@ class EnergyManagementApplication:
                 log.debug(f"The last authenticated user is the dynamic charging user. PV surplus usage is disabled.")
                 self.sonnen_battery_service.set_enable_discharge()
                 
-                avg_available_power_series = self.sonnen_battery_service.get_energy_status_with_available_power_time_series(1, self.control_structure.GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, self.control_structure.BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL)
+                avg_available_power_series = self.sonnen_battery_service.get_energy_status_with_available_power_time_series(1, self.control_structure.GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, self.control_structure.BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL, self.control_structure.CAR_CHARGING_MOVING_AVERAGE_INTERVAL)
                 if avg_available_power_series and len(avg_available_power_series) > 0:
                     available_power = avg_available_power_series[-1].average_available_power
                 else:
                     log.warning(f"Unable to calculate the average available power from the Sonnen battery due to missing energy status data. Falling back to using the minimum grid feed-in value to determine the available power for car charging, which may lead to less stable control decisions.")
                     # min_power already takes the charging-wait-time into account, because the method get_grid_feed_in_minimum looks back for the specified time to determine the minimum grid feed-in value. So we can directly use the returned minimum grid feed-in value to determine if there is enough excess energy available to turn on the car charging or if we need to turn off the car charging due to insufficient excess energy.
-                    min_power = self.sonnen_battery_service.get_grid_feed_in_average(self.control_structure.GRID_FEED_IN_MOVING_AVERAGE_INTERVAL)
+                    avg_power = self.sonnen_battery_service.get_grid_feed_in_average(self.control_structure.GRID_FEED_IN_MOVING_AVERAGE_INTERVAL)
                     # take the real power as measured by the energy meter
                     consumed_power = self.energy_meter.get_current_power_w()
                     battery_feed_in = self.sonnen_battery_service.get_battery_feed()
                     # take 75% of battery charging energy as available energy for car charging, to account for battery charging efficiency and to avoid rapidly turning on and off the car charging due to fluctuations in the battery feed-in. This means that if the battery is charging (battery_feed_in > 0), we will only consider 75% of the battery feed-in as available energy for car charging.
                     battery_discharge = -battery_feed_in if battery_feed_in < 0 else -int(3 * battery_feed_in / 4)
                     
-                    available_power = min_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power - battery_discharge
-                    log.debug(f"Minimum grid feed-in: {min_power} W, current car charging power: {consumed_power} W, buffer power: {self.control_structure.NON_USED_ENERGY_BUFFER} W, battery discharge: {battery_discharge} W, available power for car charging after buffer: {available_power} W")
+                    available_power = avg_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power - battery_discharge
+                    log.debug(f"Average grid feed-in: {avg_power} W, current car charging power: {consumed_power} W, buffer power: {self.control_structure.NON_USED_ENERGY_BUFFER} W, battery discharge: {battery_discharge} W, available power for car charging after buffer: {available_power} W")
 
                 log.debug(f"Average available power for car charging in the last {self.control_structure.GRID_FEED_IN_MOVING_AVERAGE_INTERVAL} minutes: {available_power} W")
                 

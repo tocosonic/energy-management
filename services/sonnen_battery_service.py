@@ -11,6 +11,7 @@ log = logging.getLogger(__name__)
 class EnergyStatusWithAverageAvailablePower(EnergyStatus):
     average_available_power: int | None
     average_battery_feed_in: int | None
+    average_car_charging: int | None
 
 class SonnenBatteryService:
     def __init__(self, db_service: DBService, host: str, port: int, api_key: str, non_used_energy_buffer: int):
@@ -57,7 +58,7 @@ class SonnenBatteryService:
     def refresh_status(self, car_charging: int = None, update_db: bool = True):
         self._query_status(car_charging, update_db)
 
-    def get_energy_status_with_available_power_time_series(self, minutes: int, moving_average_interval: int, battery_average_interval: int) -> list[EnergyStatusWithAverageAvailablePower]:
+    def get_energy_status_with_available_power_time_series(self, minutes: int, moving_average_interval: int, battery_average_interval: int, car_charging_average_interval: int = 5) -> list[EnergyStatusWithAverageAvailablePower]:
         """Get a time series of energy status values with average available power for the last specified number of minutes."""
         energy_status_series = self.get_energy_status_time_series(minutes + moving_average_interval)
 
@@ -66,6 +67,7 @@ class SonnenBatteryService:
 
         interval = max(1, moving_average_interval)
         interval_battery = max(1, battery_average_interval)
+        interval_car_charging = max(1, car_charging_average_interval)
         
         start_idx = max(0, len(energy_status_series) - minutes)
         end_idx = len(energy_status_series)
@@ -80,10 +82,14 @@ class SonnenBatteryService:
             battery_window_start_idx = max(0, idx - interval_battery + 1)
             battery_feed_in_window = battery_feed_in_series[battery_window_start_idx:idx + 1]
 
+            car_charging_window_start_idx = max(0, idx - interval_car_charging + 1)
+            car_charging_window = [entry.car_charging for entry in energy_status_series[car_charging_window_start_idx:idx + 1]]
+
             smoothed_feed_in = int(sum(feed_in_window) / len(feed_in_window)) if feed_in_window else 0
             smoothed_battery_feed_in = int(sum(battery_feed_in_window) / len(battery_feed_in_window)) if battery_feed_in_window else 0
+            smoothed_car_charging = int(sum(car_charging_window) / len(car_charging_window)) if car_charging_window else 0
             adjusted_battery_feed_in = smoothed_battery_feed_in if smoothed_battery_feed_in <= 0 else int((3.0 * smoothed_battery_feed_in) / 4.0)
-            average_available_power = smoothed_feed_in + (energy_status.car_charging or 0) + adjusted_battery_feed_in - self.NON_USED_ENERGY_BUFFER
+            average_available_power = smoothed_feed_in + smoothed_car_charging + adjusted_battery_feed_in - self.NON_USED_ENERGY_BUFFER
 
             energy_status_with_available_power_series.append(
                 EnergyStatusWithAverageAvailablePower(
@@ -94,7 +100,8 @@ class SonnenBatteryService:
                     battery_feed_in=energy_status.battery_feed_in,
                     car_charging=energy_status.car_charging,
                     average_available_power=average_available_power,
-                    average_battery_feed_in=smoothed_battery_feed_in
+                    average_battery_feed_in=smoothed_battery_feed_in,
+                    average_car_charging=smoothed_car_charging
                 )
             )
 
