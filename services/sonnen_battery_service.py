@@ -13,12 +13,13 @@ class EnergyStatusWithAverageAvailablePower(EnergyStatus):
     average_battery_feed_in: int | None
 
 class SonnenBatteryService:
-    def __init__(self, db_service: DBService, host, port, api_key):
+    def __init__(self, db_service: DBService, host: str, port: int, api_key: str, non_used_energy_buffer: int):
         self.db_service = db_service
         self.host = host
         self.port = port
         self.api_key = api_key
         self.sonnen_status: json = None
+        self.NON_USED_ENERGY_BUFFER = non_used_energy_buffer
         self._query_status(update_db=False) # fetch initial status without saving to db, to have the initial status available for the first call of get_battery_status() and to avoid saving an initial empty status to the db.
 
     def _query_status(self, car_charging: int = None, update_db: bool = True):
@@ -82,7 +83,7 @@ class SonnenBatteryService:
             smoothed_feed_in = int(sum(feed_in_window) / len(feed_in_window)) if feed_in_window else 0
             smoothed_battery_feed_in = int(sum(battery_feed_in_window) / len(battery_feed_in_window)) if battery_feed_in_window else 0
             adjusted_battery_feed_in = smoothed_battery_feed_in if smoothed_battery_feed_in <= 0 else int((3.0 * smoothed_battery_feed_in) / 4.0)
-            average_available_power = smoothed_feed_in + (energy_status.car_charging or 0) + adjusted_battery_feed_in
+            average_available_power = smoothed_feed_in + (energy_status.car_charging or 0) + adjusted_battery_feed_in - self.NON_USED_ENERGY_BUFFER
 
             energy_status_with_available_power_series.append(
                 EnergyStatusWithAverageAvailablePower(
