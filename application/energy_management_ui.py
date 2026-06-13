@@ -13,7 +13,7 @@ from services.bmw_cardata_service import BMWCarDataService
 
 load_dotenv()
 db_service = DBService(db_path=os.getenv("DATABASE_PATH"), energy_status_retention_minutes=int(os.getenv("SONNEN_ENERGY_STATUS_RETENTION")))
-sonnen_battery_service = SonnenBatteryService(db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"))
+sonnen_battery_service = SonnenBatteryService(db_service, host=os.getenv("SONNEN_BATTERY_HOST"), port=os.getenv("SONNEN_BATTERY_PORT"), api_key=os.getenv("SONNEN_BATTERY_API_KEY"), non_used_energy_buffer=int(os.getenv("NON_USED_ENERGY_BUFFER", 500)))
 goe_service = GoEService(host=os.getenv("GOE_HOST"), api_key=os.getenv("GOE_API_KEY"), fixed_charging_user=int(os.getenv("GOE_FIXED_CHARGING_USER")), dynamic_charging_user=int(os.getenv("GOE_DYNAMIC_CHARGING_USER")))
 energy_meter = WagoEnergyMeter(port=os.getenv("ENERGY_METER_PORT"), slave_id=int(os.getenv("ENERGY_METER_SLAVE_ID")), baudrate=int(os.getenv("ENERGY_METER_BAUDRATE")))
 ww_heatpump_service = SGReadyDeviceService(db_service, int(os.getenv("RELAY_PIN_WW")), "Weishaupt Warm Water Heatpump", int(os.getenv("WW_ENERGY_CONSUMPTION")))
@@ -21,8 +21,9 @@ heating_heatpump_service = PanasonicAquareaService(db_service, int(os.getenv("RE
 bmw_cardata_service = BMWCarDataService(db_service=db_service, vin=os.getenv("BMW_VIN"), client_id=os.getenv("BMW_CLIENT_ID"), streaming_topic=os.getenv("BMW_STREAMING_TOPIC"))
 
 STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME"))
-GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL"))
-BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL"))
+GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL", 20))
+BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL", 5))
+CAR_CHARGING_MOVING_AVERAGE_INTERVAL = int(os.getenv("CAR_CHARGING_MOVING_AVERAGE_INTERVAL", 5))
 
 def request_token():
     token = bmw_cardata_service.dcf_step3_request_access_token()
@@ -194,7 +195,7 @@ class EnergyManagementUI:
         with ui.header(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
             ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
             
-            energy_status = sonnen_battery_service.get_energy_status_with_available_power_time_series(120, moving_average_interval=GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, battery_average_interval=5)
+            energy_status = sonnen_battery_service.get_energy_status_with_available_power_time_series(120, moving_average_interval=GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, battery_average_interval=BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL, car_charging_average_interval=CAR_CHARGING_MOVING_AVERAGE_INTERVAL)
             if energy_status:
                 # get list of production values from energy_status
                 timestamps = [status.timestamp for status in energy_status]
@@ -204,6 +205,7 @@ class EnergyManagementUI:
                 battery_feed_in = [status.battery_feed_in / 1000 for status in energy_status]
                 avg_battery_feed_in = [status.average_battery_feed_in / 1000 for status in energy_status]
                 car_charging = [(status.car_charging or 0) / 1000 for status in energy_status]
+                avg_car_charging = [(status.average_car_charging or 0) / 1000 for status in energy_status]
                 available_power = [status.average_available_power / 1000 for status in energy_status]
 
                 fig = {
@@ -214,6 +216,7 @@ class EnergyManagementUI:
                         {"x": timestamps, "y": battery_feed_in, "type": "line", "name": "Battery", "line": {"color": "#50d81b"}},
                         {"x": timestamps, "y": avg_battery_feed_in, "type": "line", "name": "Avg. B.", "line": {"color": "rgba(93, 217, 109, 0.3)"}}, # {"color": "#53cf2263"}},
                         {"x": timestamps, "y": car_charging, "type": "line", "name": "Car", "line": {"color": "#ff6600"}},
+                        {"x": timestamps, "y": avg_car_charging, "type": "line", "name": "Avg. Car", "line": {"color": "rgba(255, 102, 0, 0.3)"}},
                         {"x": timestamps, "y": available_power, "type": "line", "name": "Avg. Avl.", "line": {"color": "rgba(202, 202, 201, 0.9)"}},
                     ],
                     "layout": {
@@ -228,7 +231,7 @@ class EnergyManagementUI:
                             "tickfont": {"size": 10}
                         },
                         "legend": {
-                            "font": {"size": 10}
+                            "font": {"size": 10},
                         }
                     },
                     "config": {
@@ -237,7 +240,7 @@ class EnergyManagementUI:
                         "displaylogo": False
                     }
                 }
-                ui.plotly(fig).style("width: 100%; height: 156px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
+                ui.plotly(fig).style("width: 100%; height: 170px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
             else:
                 ui.label("No energy data available").style("color: #666;")
             
