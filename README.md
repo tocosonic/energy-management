@@ -6,6 +6,9 @@ Other than that it appeared to me that Go-E's implementation of PV surplus charg
 
 <img width="700" height="1272" alt="image" src="https://github.com/user-attachments/assets/34764bc1-085d-4254-b5b7-db221137f404" />
 
+<img width="603" height="1311" alt="image" src="https://github.com/user-attachments/assets/b68d297f-1c49-458d-b7a4-714762cb505a" />
+
+
 ## Supported gears
 - RaspberryPI relay board
 - Sonnen battery (via local API)
