@@ -4,9 +4,17 @@ Since version 1.3.0 this application is fully operational (since a couple of day
 
 Other than that it appeared to me that Go-E's implementation of PV surplus charging seems to be somehow unpredictable (at least the action taken by this charger when simply provided with the amount of power available at the moment was delayed and/or unpredictable by me. That's why I relied on my own implementation).
 
+<figure>
 <img width="700" height="1272" alt="image" src="https://github.com/user-attachments/assets/34764bc1-085d-4254-b5b7-db221137f404" />
+<figcaption>Web browser view of the status. This image was created before the car charging optimization.</figcaption>
+</figure>
 
+<p />
+
+<figure>
 <img width="603" height="1311" alt="image" src="https://github.com/user-attachments/assets/b68d297f-1c49-458d-b7a4-714762cb505a" />
+<figcaption>iOS view of the status. This reflects the optimized car charging calculation.
+</figcaption></figure>
 
 
 ## Supported gears
