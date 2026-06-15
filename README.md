@@ -6,17 +6,16 @@ Other than that it appeared to me that Go-E's implementation of PV surplus charg
 
 <figure class="image">
 <img width="700" height="1272" alt="image" src="https://github.com/user-attachments/assets/34764bc1-085d-4254-b5b7-db221137f404" />
-<figcaption><em>Web browser view of the status. This image was created before the car charging optimization.</em></figcaption>
+<p><figcaption><em>Fig. 1: Web browser view of the status. This image was created before the car charging optimization.</em></figcaption></p>
 </figure>
 
 <p />
 
 <figure class="image">
-<img width="603" height="1311" alt="image" src="https://github.com/user-attachments/assets/b68d297f-1c49-458d-b7a4-714762cb505a" />
-<figcaption><em>iOS view of the status. This reflects the optimized car charging calculation.
-</em>
-</figcaption>
+<img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/b68d297f-1c49-458d-b7a4-714762cb505a" />
+<p><figcaption><em>Fig. 2. iOS view of the status. This reflects the optimized car charging calculation.</em></figcaption></p>
 </figure>
+
 <p />
 
 ## Supported gears
