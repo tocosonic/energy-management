@@ -210,14 +210,32 @@ class EnergyManagementUI:
 
                 fig = {
                     "data": [
-                        {"x": timestamps, "y": energy_productions, "type": "line", "name": "Prod.", "line": {"color": "#f3cf03"}},
-                        {"x": timestamps, "y": energy_consumptions, "type": "line", "name": "Cons.", "line": {"color": "#4355fab7"}},
-                        {"x": timestamps, "y": energy_feed_in, "type": "line", "name": "Feed-in", "line": {"color": "#505050"}},
-                        {"x": timestamps, "y": battery_feed_in, "type": "line", "name": "Battery", "line": {"color": "#50d81b"}},
-                        {"x": timestamps, "y": avg_battery_feed_in, "type": "line", "name": "Avg. B.", "line": {"color": "rgba(93, 217, 109, 0.3)"}}, # {"color": "#53cf2263"}},
-                        {"x": timestamps, "y": car_charging, "type": "line", "name": "Car", "line": {"color": "#ff6600"}},
-                        {"x": timestamps, "y": avg_car_charging, "type": "line", "name": "Avg. Car", "line": {"color": "rgba(255, 102, 0, 0.3)"}},
-                        {"x": timestamps, "y": available_power, "type": "line", "name": "Avg. Avl.", "line": {"color": "rgba(202, 202, 201, 0.9)"}},
+                        {
+                            "x": timestamps,
+                            "y": energy_productions, 
+                            "type": "scatter",
+                            "mode": "lines",
+                            "name": "Prod.", 
+                            "line": {"color": "#f3cf03"},
+                            "fill": "tozeroy",
+                            "fillcolor": "rgba(243, 207, 3, 0.1)"
+                        },
+                        {"x": timestamps, "y": energy_consumptions, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355fab7"}},
+                        {"x": timestamps, "y": energy_feed_in, "type": "scatter", "mode": "lines", "name": "Feed-in", "line": {"color": "#505050"}},
+                        {"x": timestamps, "y": battery_feed_in, "type": "scatter", "mode": "lines", "name": "Battery", "line": {"color": "#50d81b"}},
+                        {"x": timestamps, "y": avg_battery_feed_in, "type": "scatter", "mode": "lines", "name": "Avg. B.", "line": {"color": "rgba(93, 217, 109, 0.4)"}}, # {"color": "#53cf2263"}},
+                        {"x": timestamps, "y": car_charging, "type": "scatter", "mode": "lines", "name": "Car", "line": {"color": "#ff6600"}},
+                        {"x": timestamps, "y": avg_car_charging, "type": "scatter", "mode": "lines", "name": "Avg. Car", "line": {"color": "rgba(255, 102, 0, 0.3)"}},
+                        {
+                            "x": timestamps,
+                            "y": available_power,
+                            "type": "scatter",
+                            "mode": "lines",
+                            "name": "Avg. Avl.",
+                            "line": {"color": "rgba(80, 80, 80, 0.2)"},
+                            "fill": "tozeroy",
+                            "fillcolor": "rgba(202, 202, 201, 0.2)"
+                        },
                     ],
                     "layout": {
                         "margin": {"t": 0, "r": 0, "b": 14, "l": 40},
