@@ -242,11 +242,26 @@ class EnergyManagementUI:
                         "plot_bgcolor": "#f8f8f8",
                         "paper_bgcolor": "#f0f0f0",
                         "xaxis": {
-                            "tickfont": {"size": 10}
+                            "tickfont": {"size": 10},
+                            "showgrid": True,
+                            "gridcolor": "#d8d8d8",
+                            "minor": {
+                                "showgrid": True,
+                                "dtick": 15 * 60 * 1000,
+                                "gridcolor": "#d8d8d8"
+                            }
                         },
                         "yaxis": {
                             "title": {"text": "Power (kW)", "font": {"size": 10}},
-                            "tickfont": {"size": 10}
+                            "tickfont": {"size": 10},
+                            "showgrid": True,
+                            "gridcolor": "#d8d8d8",
+                            "dtick": 2,
+                            "minor": {
+                                "showgrid": True,
+                                "dtick": 0.5,
+                                "gridcolor": "#eeeeee"
+                            }
                         },
                         "legend": {
                             "font": {"size": 10},
