@@ -39,7 +39,15 @@ class EnergyManagementUI:
 
     def run(self):
         app.add_static_files("/static", "static")
-        ui.run(title="Energy Status Dashboard", favicon="static/energy_status_dashboard.ico")
+        cert_dir = os.path.expanduser("~/.ssh/server")
+        ui.run(
+            title="Energy Status Dashboard",
+            favicon="static/energy_status_dashboard.ico",
+            host="0.0.0.0",
+            port=8443,
+            ssl_certfile=f"{cert_dir}/server-cert.pem",
+            ssl_keyfile=f"{cert_dir}/server-key.pem"
+        )
                
     @ui.page("/")
     def main_page():
