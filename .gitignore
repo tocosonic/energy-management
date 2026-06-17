@@ -26,7 +26,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 *.db
-
+*.pem
+*.key
+*.csr
+*.srl
+*.crt
 
 # PyInstaller
 #   Usually these files are written by a python script from a template

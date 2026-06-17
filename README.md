@@ -31,6 +31,10 @@ Other than that it appeared to me that Go-E's implementation of PV surplus charg
 It's rather easy to adapt this service to your own environment, provided that your equipment supports an API and provides the required data.
 For that you can simply implement your own service class and replace the default service by your custom service.
 
+## Generating certificates
+
+Run `./create-ssl-key.sh` to create the required keys and certificates. `root-cert.pem` and `root-key.pem` are the root key and certificate which are used to sign the server's CSR and thus create the final key and the certificate (`server-cert.pem` and `server-key.pem`). In your local operating system (e.g. Windows, iOS) you have to install and trust the server certificate. By going this way I was able to get TLS up and running on Windows 11 and iOS without getting any certificate-related warnings.
+
 ## Version history
 - `control_relays.py` was the first version of the energy controller without supporting an electric car charger.
 Now I've started to redesign everything and to support an electric car charger.
