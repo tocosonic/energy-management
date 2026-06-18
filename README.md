@@ -4,21 +4,16 @@ Since version 1.3.0 this application is fully operational (since a couple of day
 
 Other than that it appeared to me that Go-E's implementation of PV surplus charging seems to be somehow unpredictable (at least the action taken by this charger when simply provided with the amount of power available at the moment was delayed and/or unpredictable by me. That's why I relied on my own implementation).
 
-
-
-<img width="603" height="1311" alt="image" src="https://github.com/user-attachments/assets/38394b49-b996-4495-80c5-8d2dfe46e09d" />
-
-
 <figure class="image">
-<img width="700" height="1272" alt="image" src="https://github.com/user-attachments/assets/34764bc1-085d-4254-b5b7-db221137f404" />
-<p><figcaption><em>Fig. 1: Web browser view of the status. This image was created before the car charging optimization.</em></figcaption></p>
+<img width="793" height="1365" alt="image" src="https://github.com/user-attachments/assets/24389905-f46a-4b94-9324-8d9b94f889fc" />
+<p><figcaption><em>Fig. 1: Web browser view of the status. This page was installed as web app in Windows 11.</em></figcaption></p>
 </figure>
 
 <p />
 
 <figure class="image">
-<img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/b68d297f-1c49-458d-b7a4-714762cb505a" />
-<p><figcaption><em>Fig. 2. iOS view of the status. This reflects the optimized car charging calculation.</em></figcaption></p>
+<img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/38394b49-b996-4495-80c5-8d2dfe46e09d" />
+<p><figcaption><em>Fig. 2. iOS view of the status. This page was installed as shortcut on the home screen.</em></figcaption></p>
 </figure>
 
 <p />
