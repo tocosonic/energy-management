@@ -277,7 +277,15 @@ class EnergyManagementUI:
 
                         {"x": timestamps, "y": energy_consumptions, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355fab7"}},
                         {"x": timestamps, "y": energy_feed_in, "type": "scatter", "mode": "lines", "name": "Feed-in", "line": {"color": "#505050"}},
-                        {"x": timestamps, "y": battery_feed_in, "type": "scatter", "mode": "lines", "name": "Battery", "line": {"color": "#50d81b"}},
+                        {
+                            "x": timestamps,
+                            "y": battery_feed_in,
+                            "type": "scatter",
+                            "mode": "lines",
+                            "name": "Battery",
+                            "line": {"color": "#50d81b"},
+                            "fill": "tozeroy",
+                            "fillcolor": "rgba(80, 216, 27, 0.20)"},
                         # {"x": timestamps, "y": avg_battery_feed_in, "type": "scatter", "mode": "lines", "name": "Avg. B.", "line": {"color": "rgba(93, 217, 109, 0.4)"}}, # {"color": "#53cf2263"}},
                         {"x": timestamps, "y": car_charging, "type": "scatter", "mode": "lines", "name": "Car", "line": {"color": "#ff6600"}},
                         # {"x": timestamps, "y": avg_car_charging, "type": "scatter", "mode": "lines", "name": "Avg. Car", "line": {"color": "rgba(255, 102, 0, 0.4)"}},
