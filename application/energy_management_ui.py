@@ -203,7 +203,7 @@ class EnergyManagementUI:
         with ui.header(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
             ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
             
-            energy_status = sonnen_battery_service.get_energy_status_with_available_power_time_series(120, moving_average_interval=GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, battery_average_interval=BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL, car_charging_average_interval=CAR_CHARGING_MOVING_AVERAGE_INTERVAL)
+            energy_status = sonnen_battery_service.get_energy_status_with_available_power_time_series(420, moving_average_interval=GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, battery_average_interval=BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL, car_charging_average_interval=CAR_CHARGING_MOVING_AVERAGE_INTERVAL)
             if energy_status:
                 # get list of production values from energy_status
                 timestamps = [status.timestamp for status in energy_status]
@@ -216,6 +216,10 @@ class EnergyManagementUI:
                 avg_car_charging = [(status.average_car_charging or 0) / 1000 for status in energy_status]
                 available_power = [status.average_available_power / 1000 for status in energy_status]
 
+                threshold = 1.380  # threshold value in kW == 1 phase at 6A, which is the minimum charging current for GoE to start charging
+                min_y = min(min(energy_productions), min(energy_consumptions), min(energy_feed_in), min(battery_feed_in), min(avg_battery_feed_in), min(car_charging), min(avg_car_charging), min(available_power), threshold)
+                min_y = min_y * 1.3 if min_y < 0 else 0
+
                 fig = {
                     "data": [
                         {
@@ -226,14 +230,14 @@ class EnergyManagementUI:
                             "name": "Prod.", 
                             "line": {"color": "#f3cf03"},
                             "fill": "tozeroy",
-                            "fillcolor": "rgba(243, 207, 3, 0.1)"
+                            "fillcolor": "rgba(243, 207, 3, 0.2)"
                         },
                         {"x": timestamps, "y": energy_consumptions, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355fab7"}},
                         {"x": timestamps, "y": energy_feed_in, "type": "scatter", "mode": "lines", "name": "Feed-in", "line": {"color": "#505050"}},
                         {"x": timestamps, "y": battery_feed_in, "type": "scatter", "mode": "lines", "name": "Battery", "line": {"color": "#50d81b"}},
                         {"x": timestamps, "y": avg_battery_feed_in, "type": "scatter", "mode": "lines", "name": "Avg. B.", "line": {"color": "rgba(93, 217, 109, 0.4)"}}, # {"color": "#53cf2263"}},
                         {"x": timestamps, "y": car_charging, "type": "scatter", "mode": "lines", "name": "Car", "line": {"color": "#ff6600"}},
-                        {"x": timestamps, "y": avg_car_charging, "type": "scatter", "mode": "lines", "name": "Avg. Car", "line": {"color": "rgba(255, 102, 0, 0.3)"}},
+                        {"x": timestamps, "y": avg_car_charging, "type": "scatter", "mode": "lines", "name": "Avg. Car", "line": {"color": "rgba(255, 102, 0, 0.4)"}},
                         {
                             "x": timestamps,
                             "y": available_power,
@@ -242,7 +246,7 @@ class EnergyManagementUI:
                             "name": "Avg. Avl.",
                             "line": {"color": "rgba(80, 80, 80, 0.2)"},
                             "fill": "tozeroy",
-                            "fillcolor": "rgba(202, 202, 201, 0.2)"
+                            "fillcolor": "rgba(202, 202, 201, 0.4)"
                         },
                     ],
                     "layout": {
@@ -273,7 +277,34 @@ class EnergyManagementUI:
                         },
                         "legend": {
                             "font": {"size": 10},
-                        }
+                        },
+                        "shapes": [
+                            {
+                                "type": "line",
+                                "xref": "paper",
+                                "yref": "y",
+                                "x0": 0,
+                                "x1": 1,
+                                "y0": threshold,
+                                "y1": threshold,
+                                "line": {
+                                    "color": "#868686",
+                                    "width": 1,
+                                    "dash": "dash"
+                                }
+                            },
+                            {
+                                "type": "rect",
+                                "xref": "paper",
+                                "yref": "y",
+                                "x0": 0,
+                                "x1": 1,
+                                "y0": threshold,
+                                "y1": min_y,
+                                "fillcolor": "rgba(180,180,180,0.2)",
+                                "line": {"width": 0}
+                            }
+                        ]
                     },
                     "config": {
                         "staticPlot": True,
