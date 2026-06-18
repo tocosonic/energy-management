@@ -1,4 +1,5 @@
 import os
+import math
 
 from nicegui import ui, app
 from datetime import datetime, timedelta
@@ -217,11 +218,33 @@ class EnergyManagementUI:
                 available_power = [status.average_available_power / 1000 for status in energy_status]
 
                 threshold = 1.380  # threshold value in kW == 1 phase at 6A, which is the minimum charging current for GoE to start charging
-                min_y = min(min(energy_productions), min(energy_consumptions), min(energy_feed_in), min(battery_feed_in), min(car_charging), min(available_power), threshold)
-                min_y = min_y * 1.3 if min_y < 0 else 0
+                min_y = min(min(energy_productions), min(energy_consumptions), min(energy_feed_in), min(battery_feed_in), min(car_charging), min(available_power))
+                min_y = math.floor(min_y) if min_y < 0 else 0
+                
+                max_y = max(max(energy_productions), max(energy_consumptions), max(energy_feed_in), max(battery_feed_in), max(car_charging), max(available_power)) * 1.1
+                
+                threshold_band = {
+                    "x": [timestamps[0], timestamps[-1], timestamps[-1], timestamps[0]],
+                    "y": [threshold, threshold, min_y, min_y],
+                    "type": "scatter",
+                    "mode": "lines",
+                    "name": "No car",
+                    "fill": "toself",
+                    "line": {"width": 0},
+                    "fillcolor": "rgba(0, 0, 0, 0)",
+                    "fillpattern": {
+                        "shape": "/",
+                        "fgcolor": "rgba(140, 140, 140, 0.45)",
+                        "size": 8,
+                        "solidity": 0.25
+                    },
+                    "hoverinfo": "skip",
+                    # "showlegend": False
+                }
 
                 fig = {
                     "data": [
+                        threshold_band,
                         {
                             "x": timestamps,
                             "y": energy_productions, 
@@ -230,7 +253,16 @@ class EnergyManagementUI:
                             "name": "Prod.", 
                             "line": {"color": "#f3cf03"},
                             "fill": "tozeroy",
-                            "fillcolor": "rgba(243, 207, 3, 0.2)"
+                            "fillcolor": "rgba(243, 207, 3, 0.15)",
+                        },
+                        {
+                            "x": timestamps,
+                            "y": [threshold] * len(timestamps),
+                            "type": "scatter",
+                            "mode": "lines",
+                            "line": {"width": 0},
+                            "hoverinfo": "skip",
+                            "showlegend": False,
                         },
                         {
                             "x": timestamps,
@@ -239,9 +271,10 @@ class EnergyManagementUI:
                             "mode": "lines",
                             "name": "Avg. Avl.",
                             "line": {"color": "rgba(80, 80, 80, 0.3)"},
-                            "fill": "tozeroy",
-                            "fillcolor": "rgba(202, 202, 201, 0.4)"
+                            "fill": "tonexty",
+                            "fillcolor": "rgba(202, 202, 201, 0.30)"
                         },
+
                         {"x": timestamps, "y": energy_consumptions, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355fab7"}},
                         {"x": timestamps, "y": energy_feed_in, "type": "scatter", "mode": "lines", "name": "Feed-in", "line": {"color": "#505050"}},
                         {"x": timestamps, "y": battery_feed_in, "type": "scatter", "mode": "lines", "name": "Battery", "line": {"color": "#50d81b"}},
@@ -273,7 +306,9 @@ class EnergyManagementUI:
                                 "showgrid": True,
                                 "dtick": 0.5,
                                 "gridcolor": "#eeeeee"
-                            }
+                            },
+                            "autorange": False,
+                            "range": [min_y, max_y]
                         },
                         "legend": {
                             "font": {"size": 10},
@@ -281,10 +316,10 @@ class EnergyManagementUI:
                         "shapes": [
                             {
                                 "type": "line",
-                                "xref": "paper",
+                                "xref": "x",
                                 "yref": "y",
-                                "x0": 0,
-                                "x1": 1,
+                                "x0": timestamps[0],
+                                "x1": timestamps[-1],
                                 "y0": threshold,
                                 "y1": threshold,
                                 "line": {
@@ -292,17 +327,6 @@ class EnergyManagementUI:
                                     "width": 1,
                                     "dash": "dash"
                                 }
-                            },
-                            {
-                                "type": "rect",
-                                "xref": "paper",
-                                "yref": "y",
-                                "x0": 0,
-                                "x1": 1,
-                                "y0": threshold,
-                                "y1": min_y,
-                                "fillcolor": "rgba(180,180,180,0.2)",
-                                "line": {"width": 0}
                             }
                         ]
                     },
