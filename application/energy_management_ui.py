@@ -228,7 +228,7 @@ class EnergyManagementUI:
                     "y": [threshold, threshold, min_y, min_y],
                     "type": "scatter",
                     "mode": "lines",
-                    "name": "No car",
+                    "name": "No car<br>charging",
                     "fill": "toself",
                     "line": {"width": 0},
                     "fillcolor": "rgba(0, 0, 0, 0)",
@@ -239,7 +239,6 @@ class EnergyManagementUI:
                         "solidity": 0.25
                     },
                     "hoverinfo": "skip",
-                    # "showlegend": False
                 }
 
                 fig = {
@@ -272,9 +271,8 @@ class EnergyManagementUI:
                             "name": "Avg. Avl.",
                             "line": {"color": "rgba(80, 80, 80, 0.3)"},
                             "fill": "tonexty",
-                            "fillcolor": "rgba(202, 202, 201, 0.30)"
+                            "fillcolor": "rgba(182, 182, 221, 0.3)"
                         },
-
                         {"x": timestamps, "y": energy_consumptions, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355fab7"}},
                         {"x": timestamps, "y": energy_feed_in, "type": "scatter", "mode": "lines", "name": "Feed-in", "line": {"color": "#505050"}},
                         {
@@ -285,7 +283,7 @@ class EnergyManagementUI:
                             "name": "Battery",
                             "line": {"color": "#50d81b"},
                             "fill": "tozeroy",
-                            "fillcolor": "rgba(80, 216, 27, 0.20)"},
+                            "fillcolor": "rgba(80, 216, 27, 0.2)"},
                         # {"x": timestamps, "y": avg_battery_feed_in, "type": "scatter", "mode": "lines", "name": "Avg. B.", "line": {"color": "rgba(93, 217, 109, 0.4)"}}, # {"color": "#53cf2263"}},
                         {"x": timestamps, "y": car_charging, "type": "scatter", "mode": "lines", "name": "Car", "line": {"color": "#ff6600"}},
                         # {"x": timestamps, "y": avg_car_charging, "type": "scatter", "mode": "lines", "name": "Avg. Car", "line": {"color": "rgba(255, 102, 0, 0.4)"}},
