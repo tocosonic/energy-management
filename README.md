@@ -10,6 +10,7 @@ Other than that it appeared to me that Go-E's implementation of PV surplus charg
 </figure>
 
 <p />
+<img width="1206" height="2622" alt="image" src="https://github.com/user-attachments/assets/61829f2f-367d-4aa6-aa8b-71546b6ecdd8" />
 
 <figure class="image">
 <img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/38394b49-b996-4495-80c5-8d2dfe46e09d" />
