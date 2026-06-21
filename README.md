@@ -31,6 +31,86 @@ Other than that it appeared to me that Go-E's implementation of PV surplus charg
 It's rather easy to adapt this service to your own environment, provided that your equipment supports an API and provides the required data.
 For that you can simply implement your own service class and replace the default service by your custom service.
 
+## Installation
+
+1. Configuration of the Service
+You need a `.env` file to configure the service. Create a `.env` file in the same directory as your main.py with the following content:
+
+    ~~~env
+    RELAY_PIN_WW=5
+    RELAY_PIN_HEATING1=6
+    RELAY_PIN_HEATING2=13
+    OPENWEATHER_API_KEY=<your_openweather_api_key>
+    OPENWEATHER_LAT=<your_openweather_latitude>
+    OPENWEATHER_LON=<your_openweather_longitude>
+    SONNEN_BATTERY_HOST=<your_sonnen_battery_host>
+    SONNEN_BATTERY_PORT=8080
+    SONNEN_BATTERY_API_KEY=<your_sonnen_battery_api_key>
+    GOE_HOST=<your_goe_host>
+    GOE_API_KEY=<your_goe_api_key>
+    GOE_FIXED_CHARGING_USER=1
+    GOE_DYNAMIC_CHARGING_USER=0
+    DATABASE_PATH=/home/<your_user>/projects/energy-management/em.db
+    WW_ENERGY_CONSUMPTION=700
+    HEATING1_ENERGY_CONSUMPTION=500
+    HEATING2_ENERGY_CONSUMPTION=200
+    START_WW_WAIT_TIME=5
+    START_HEATING_WAIT_TIME=5
+    START_CAR_CHARGING_WAIT_TIME=7
+    STOP_WW_WAIT_TIME=15
+    STOP_HEATING_WAIT_TIME=10
+    STOP_CAR_CHARGING_WAIT_TIME=15
+    NON_USED_ENERGY_BUFFER=-300
+    GRID_FEED_IN_MOVING_AVERAGE_INTERVAL=10
+    BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL=10
+    CAR_CHARGING_MOVING_AVERAGE_INTERVAL=10
+    ENERGY_METER_SLAVE_ID=1
+    ENERGY_METER_PORT=/dev/ttyACM0
+    ENERGY_METER_BAUDRATE=9600
+    BMW_CLIENT_ID=<BMW car data client id>
+    BMW_VIN=<BMW VIN>
+    BMW_STREAMING_USER=<BMW car data streaming user>
+    BMW_STREAMING_TOPIC=<BMW VIN>
+    ~~~
+
+2. Create a systemd service file at `/etc/systemd/system/energy-management.service` with the following content:
+    ~~~env
+    [Unit]
+    Description=Energy Management Application
+    After=network.target
+
+    [Service]
+    ExecStart=/usr/bin/python3 /path/to/your/main.py
+    Restart=always
+    RestartSec=5
+    User=your_user
+    Group=your_group
+    EnvironmentFile=/path/to/your/.env
+
+    [Install]
+    WantedBy=multi-user.target
+    ~~~    
+3. Reload systemd to recognize the new service:
+    
+    `sudo systemctl daemon-reload`
+    
+4. Enable the service to start on boot:
+
+    `sudo systemctl enable energy-management.service`
+
+5. Start the service:
+
+    `sudo systemctl start energy-management.service`
+    
+6. Check the status of the service:
+
+    `sudo systemctl status energy-management.service`
+    
+7. View logs for the service:
+
+    `sudo journalctl -u energy-management.service -f`
+    
+
 ## Generating certificates
 
 Run `./create-ssl-key.sh` to create the required keys and certificates. `root-cert.pem` and `root-key.pem` are the root key and certificate which are used to sign the server's CSR and thus create the final key and the certificate (`server-cert.pem` and `server-key.pem`). In your local operating system (e.g. Windows, iOS) you have to install and trust the server certificate. By going this way I was able to get TLS up and running on Windows 11 and iOS without getting any certificate-related warnings.

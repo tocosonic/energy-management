@@ -29,9 +29,9 @@ class ControlStructure:
     STOP_CAR_CHARGING_WAIT_TIME: int = 15
     NON_USED_ENERGY_BUFFER: int = 1000  # Buffer in watts to account for fluctuations in energy production and consumption. This means that the application will only turn on devices if there is at least this much excess energy available, and will only turn off devices if the energy deficit is at least this much.
     GOE_USE_PV_SURPLUS: bool = False  # Whether to use the PV surplus available power reported by the GoE API to determine if there is enough excess energy available to turn on the car charging. If set to True, the application will use the PV surplus available power reported by the GoE API instead of the minimum grid feed-in value from the Sonnen battery to determine if there is enough excess energy available to turn on the car charging. This can be useful if the car charging is prioritized over other devices and you want to use the PV surplus available power to determine if there is enough excess energy available to turn on the car charging.
-    GRID_FEED_IN_MOVING_AVERAGE_INTERVAL: int = 20 # The time interval in minutes for calculating the moving average of the grid feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the grid feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy.
-    BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL: int = 5 # The time interval in minutes for calculating the moving average of the battery feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the battery feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy, especially for car charging where we want to avoid rapidly turning on and off the car charging due to fluctuations in the battery feed-in.
-    CAR_CHARGING_MOVING_AVERAGE_INTERVAL: int = 5 # The time interval in minutes for calculating the moving average of the car charging power. This can be used to smooth out fluctuations in the car charging power and make more stable decisions about when to turn on or off the car charging based on the available excess energy, especially for car charging where we want to avoid rapidly turning on and off the car charging due to fluctuations in the car charging power.
+    GRID_FEED_IN_MOVING_AVERAGE_INTERVAL: int = 10 # The time interval in minutes for calculating the moving average of the grid feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the grid feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy.
+    BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL: int = 10 # The time interval in minutes for calculating the moving average of the battery feed-in value from the Sonnen battery. This can be used to smooth out fluctuations in the battery feed-in value and make more stable decisions about when to turn on or off devices based on the available excess energy, especially for car charging where we want to avoid rapidly turning on and off the car charging due to fluctuations in the battery feed-in.
+    CAR_CHARGING_MOVING_AVERAGE_INTERVAL: int = 10 # The time interval in minutes for calculating the moving average of the car charging power. This can be used to smooth out fluctuations in the car charging power and make more stable decisions about when to turn on or off the car charging based on the available excess energy, especially for car charging where we want to avoid rapidly turning on and off the car charging due to fluctuations in the car charging power.
     
 class EnergyManagementApplication:
     def __init__(self):
@@ -62,9 +62,9 @@ class EnergyManagementApplication:
             STOP_CAR_CHARGING_WAIT_TIME = int(os.getenv("STOP_CAR_CHARGING_WAIT_TIME", 15)),
             NON_USED_ENERGY_BUFFER = int(os.getenv("NON_USED_ENERGY_BUFFER", 500)),
             GOE_USE_PV_SURPLUS = os.getenv("GOE_USE_PV_SURPLUS", "false").lower() == "true",
-            GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL", 20)),
-            BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL", 5)),
-            CAR_CHARGING_MOVING_AVERAGE_INTERVAL = int(os.getenv("CAR_CHARGING_MOVING_AVERAGE_INTERVAL", 5))
+            GRID_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("GRID_FEED_IN_MOVING_AVERAGE_INTERVAL", 10)),
+            BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL = int(os.getenv("BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL", 10)),
+            CAR_CHARGING_MOVING_AVERAGE_INTERVAL = int(os.getenv("CAR_CHARGING_MOVING_AVERAGE_INTERVAL", 10))
         )
 
     def run(self):

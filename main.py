@@ -100,10 +100,16 @@ def main(bypass_run: bool = False, start_ui: bool = False, bmw_test: bool = Fals
         STOP_HEATING_WAIT_TIME=10
         STOP_CAR_CHARGING_WAIT_TIME=15
         NON_USED_ENERGY_BUFFER=-300
+        GRID_FEED_IN_MOVING_AVERAGE_INTERVAL=10
+        BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL=10
+        CAR_CHARGING_MOVING_AVERAGE_INTERVAL=10
         ENERGY_METER_SLAVE_ID=1
         ENERGY_METER_PORT=/dev/ttyACM0
         ENERGY_METER_BAUDRATE=9600
-
+        BMW_CLIENT_ID=<BMW car data client id>
+        BMW_VIN=<BMW VIN>
+        BMW_STREAMING_USER=<BMW car data streaming user>
+        BMW_STREAMING_TOPIC=<BMW VIN>
     """
     
     if start_ui:
