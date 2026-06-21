@@ -5,7 +5,7 @@ Since version 1.3.0 this application is fully operational (since a couple of day
 Other than that it appeared to me that Go-E's implementation of PV surplus charging seems to be somehow unpredictable (at least the action taken by this charger when simply provided with the amount of power available at the moment was delayed and/or unpredictable by me. That's why I relied on my own implementation).
 
 <figure class="image">
-<img width="793" height="1365" alt="image" src="https://github.com/user-attachments/assets/24389905-f46a-4b94-9324-8d9b94f889fc" />
+<img width="793" height="1365" alt="image" src="https://github.com/user-attachments/assets/b449a856-774c-4c88-b0d4-d9c096393f46" />
 <p><figcaption><em>Fig. 1: Web browser view of the status. This page was installed as web app in Windows 11.</em></figcaption></p>
 </figure>
 
