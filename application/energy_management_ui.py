@@ -85,16 +85,16 @@ class EnergyManagementUI:
             power = energy_meter.get_current_power_kw()
             ui.label(f"{power} kW").style("font-size: 16px; margin-top: 0px;")
 
-            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("PV surplus enabled").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            pv_enabled = goe_service._is_pv_surplus_enabled()
-            logic_mode = goe_service.get_logic_mode()
-            ui.label("Yes" if pv_enabled else "No").style("font-size: 16px; margin-top: 0px;")
+            # ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            # ui.label("PV surplus enabled").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            # pv_enabled = goe_service._is_pv_surplus_enabled()
+            # logic_mode = goe_service.get_logic_mode()
+            # ui.label("Yes" if pv_enabled else "No").style("font-size: 16px; margin-top: 0px;")
 
-            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("Logic mode").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            logic_mode = goe_service.get_logic_mode()
-            ui.label(f"{logic_mode.label}").style("font-size: 16px; margin-top: 0px;")
+            # ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            # ui.label("Logic mode").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            # logic_mode = goe_service.get_logic_mode()
+            # ui.label(f"{logic_mode.label}").style("font-size: 16px; margin-top: 0px;")
 
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Configured phases / current").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
@@ -208,8 +208,8 @@ class EnergyManagementUI:
             if energy_status:
                 # get list of production values from energy_status
                 timestamps = [status.timestamp for status in energy_status]
-                energy_productions = [status.production / 1000 for status in energy_status]
-                energy_consumptions = [status.consumption / 1000 for status in energy_status]
+                energy_production = [status.production / 1000 for status in energy_status]
+                energy_consumption = [status.consumption / 1000 for status in energy_status]
                 energy_feed_in = [status.feed_in / 1000 for status in energy_status]
                 battery_feed_in = [status.battery_feed_in / 1000 for status in energy_status]
                 # avg_battery_feed_in = [status.average_battery_feed_in / 1000 for status in energy_status]
@@ -217,11 +217,13 @@ class EnergyManagementUI:
                 # avg_car_charging = [(status.average_car_charging or 0) / 1000 for status in energy_status]
                 available_power = [status.average_available_power / 1000 for status in energy_status]
 
+                energy_consumption_home = [max(0, cons - car) for cons, car in zip(energy_consumption, car_charging)]
+                
                 threshold = 1.380  # threshold value in kW == 1 phase at 6A, which is the minimum charging current for GoE to start charging
-                min_y = min(min(energy_productions), min(energy_consumptions), min(energy_feed_in), min(battery_feed_in), min(car_charging), min(available_power))
+                min_y = min(min(energy_production), min(energy_consumption), min(energy_feed_in), min(battery_feed_in), min(car_charging), min(available_power))
                 min_y = math.floor(min_y) if min_y < 0 else 0
                 
-                max_y = max(max(energy_productions), max(energy_consumptions), max(energy_feed_in), max(battery_feed_in), max(car_charging), max(available_power)) * 1.1
+                max_y = max(max(energy_production), max(energy_consumption), max(energy_feed_in), max(battery_feed_in), max(car_charging), max(available_power)) * 1.1
                 
                 threshold_band = {
                     "x": [timestamps[0], timestamps[-1], timestamps[-1], timestamps[0]],
@@ -246,7 +248,7 @@ class EnergyManagementUI:
                         threshold_band,
                         {
                             "x": timestamps,
-                            "y": energy_productions, 
+                            "y": energy_production, 
                             "type": "scatter",
                             "mode": "lines",
                             "name": "Prod.", 
@@ -273,7 +275,8 @@ class EnergyManagementUI:
                             "fill": "tonexty",
                             "fillcolor": "rgba(182, 182, 221, 0.3)"
                         },
-                        {"x": timestamps, "y": energy_consumptions, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355fab7"}},
+                        {"x": timestamps, "y": energy_consumption_home, "type": "scatter", "mode": "lines", "name": "Home", "line": {"color": "#4355fab0"}},
+                        {"x": timestamps, "y": energy_consumption, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355faff"}},
                         {"x": timestamps, "y": energy_feed_in, "type": "scatter", "mode": "lines", "name": "Feed-in", "line": {"color": "#505050"}},
                         {
                             "x": timestamps,

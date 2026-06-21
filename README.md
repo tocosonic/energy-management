@@ -5,18 +5,18 @@ Since version 1.3.0 this application is fully operational (since a couple of day
 Other than that it appeared to me that Go-E's implementation of PV surplus charging seems to be somehow unpredictable (at least the action taken by this charger when simply provided with the amount of power available at the moment was delayed and/or unpredictable by me. That's why I relied on my own implementation).
 
 <figure class="image">
-<img width="793" height="1365" alt="image" src="https://github.com/user-attachments/assets/24389905-f46a-4b94-9324-8d9b94f889fc" />
+<img width="793" height="1365" alt="image" src="https://github.com/user-attachments/assets/91f8c651-9cf5-4def-8b3c-4fe4a0661081" />
 <p><figcaption><em>Fig. 1: Web browser view of the status. This page was installed as web app in Windows 11.</em></figcaption></p>
 </figure>
 
-<p />
+<br />
 
 <figure class="image">
-<img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/38394b49-b996-4495-80c5-8d2dfe46e09d" />
+<img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/61829f2f-367d-4aa6-aa8b-71546b6ecdd8" />
 <p><figcaption><em>Fig. 2. iOS view of the status. This page was installed as shortcut on the home screen.</em></figcaption></p>
 </figure>
 
-<p />
+<br />
 
 ## Supported gears
 - RaspberryPI relay board
@@ -30,6 +30,86 @@ Other than that it appeared to me that Go-E's implementation of PV surplus charg
 
 It's rather easy to adapt this service to your own environment, provided that your equipment supports an API and provides the required data.
 For that you can simply implement your own service class and replace the default service by your custom service.
+
+## Installation
+
+1. Configuration of the Service
+You need a `.env` file to configure the service. Create a `.env` file in the same directory as your main.py with the following content:
+
+    ~~~env
+    RELAY_PIN_WW=5
+    RELAY_PIN_HEATING1=6
+    RELAY_PIN_HEATING2=13
+    OPENWEATHER_API_KEY=<your_openweather_api_key>
+    OPENWEATHER_LAT=<your_openweather_latitude>
+    OPENWEATHER_LON=<your_openweather_longitude>
+    SONNEN_BATTERY_HOST=<your_sonnen_battery_host>
+    SONNEN_BATTERY_PORT=8080
+    SONNEN_BATTERY_API_KEY=<your_sonnen_battery_api_key>
+    GOE_HOST=<your_goe_host>
+    GOE_API_KEY=<your_goe_api_key>
+    GOE_FIXED_CHARGING_USER=1
+    GOE_DYNAMIC_CHARGING_USER=0
+    DATABASE_PATH=/home/<your_user>/projects/energy-management/em.db
+    WW_ENERGY_CONSUMPTION=700
+    HEATING1_ENERGY_CONSUMPTION=500
+    HEATING2_ENERGY_CONSUMPTION=200
+    START_WW_WAIT_TIME=5
+    START_HEATING_WAIT_TIME=5
+    START_CAR_CHARGING_WAIT_TIME=7
+    STOP_WW_WAIT_TIME=15
+    STOP_HEATING_WAIT_TIME=10
+    STOP_CAR_CHARGING_WAIT_TIME=15
+    NON_USED_ENERGY_BUFFER=-300
+    GRID_FEED_IN_MOVING_AVERAGE_INTERVAL=10
+    BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL=10
+    CAR_CHARGING_MOVING_AVERAGE_INTERVAL=10
+    ENERGY_METER_SLAVE_ID=1
+    ENERGY_METER_PORT=/dev/ttyACM0
+    ENERGY_METER_BAUDRATE=9600
+    BMW_CLIENT_ID=<BMW car data client id>
+    BMW_VIN=<BMW VIN>
+    BMW_STREAMING_USER=<BMW car data streaming user>
+    BMW_STREAMING_TOPIC=<BMW VIN>
+    ~~~
+
+2. Create a systemd service file at `/etc/systemd/system/energy-management.service` with the following content:
+    ~~~env
+    [Unit]
+    Description=Energy Management Application
+    After=network.target
+
+    [Service]
+    ExecStart=/usr/bin/python3 /path/to/your/main.py
+    Restart=always
+    RestartSec=5
+    User=your_user
+    Group=your_group
+    EnvironmentFile=/path/to/your/.env
+
+    [Install]
+    WantedBy=multi-user.target
+    ~~~    
+3. Reload systemd to recognize the new service:
+    
+    `sudo systemctl daemon-reload`
+    
+4. Enable the service to start on boot:
+
+    `sudo systemctl enable energy-management.service`
+
+5. Start the service:
+
+    `sudo systemctl start energy-management.service`
+    
+6. Check the status of the service:
+
+    `sudo systemctl status energy-management.service`
+    
+7. View logs for the service:
+
+    `sudo journalctl -u energy-management.service -f`
+    
 
 ## Generating certificates
 
