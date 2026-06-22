@@ -345,7 +345,7 @@ class EnergyManagementUI:
                         "displaylogo": False
                     }
                 }
-                ui.plotly(fig).style("width: 100%; height: 170px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
+                ui.plotly(fig).style("width: 100%; height: 180px; background-color: #f0f0f0; border: 0px solid #ddd; border-radius: 0px; padding: 0px;")
             else:
                 ui.label("No energy data available").style("color: #666;")
             
