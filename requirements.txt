@@ -44,7 +44,7 @@ MarkupSafe==3.0.3
 more-itertools==8.10.0
 multidict==6.7.1
 nicegui==3.13.0
-oauthlib==3.2.2
+oauthlib==3.3.1
 orjson==3.11.9
 packaging==23.0
 paho-mqtt==2.1.0
