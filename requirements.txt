@@ -40,7 +40,7 @@ lgpio==0.2.2.0
 lxml==6.1.1
 lxml_html_clean==0.4.5
 markdown2==2.5.5
-MarkupSafe==2.1.2
+MarkupSafe==3.0.3
 more-itertools==8.10.0
 multidict==6.7.1
 nicegui==3.12.1
