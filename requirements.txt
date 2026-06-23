@@ -60,7 +60,7 @@ pyee==13.0.1
 Pygments==2.20.0
 PyGObject==3.42.2
 pyinotify==0.9.6
-PyJWT==2.6.0
+PyJWT==2.13.0
 pymodbus==3.13.1
 pyOpenSSL==23.0.0
 pyparsing==3.3.2
