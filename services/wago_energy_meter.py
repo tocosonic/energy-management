@@ -1,4 +1,5 @@
 import logging
+from pymodbus import FramerType
 from pymodbus.client import ModbusSerialClient
 import serial.tools.list_ports
 import struct
@@ -8,7 +9,7 @@ log = logging.getLogger(__name__)
 class WagoEnergyMeter:
     def __init__(self, port, slave_id=1, baudrate=9600, timeout=3):
         self.slave_id = slave_id  # The slave ID of the Wago energy meter. This may need to be adjusted based on the specific configuration of the energy meter.   
-        self.client = ModbusSerialClient(method='rtu', port=port, baudrate=baudrate, timeout=timeout, parity=serial.PARITY_EVEN, stopbits=1, bytesize=8)
+        self.client = ModbusSerialClient(framer=FramerType.RTU, port=port, baudrate=baudrate, timeout=timeout, parity=serial.PARITY_EVEN, stopbits=1, bytesize=8)
 
     def _decode_ieee754_float32_abcd(self, raw_registers) -> float:
         """Decode IEEE-754 float32 with ABCD byte order (register 0: AB, register 1: CD)."""
@@ -18,7 +19,7 @@ class WagoEnergyMeter:
     def get_total_energy_kwh(self) -> float:
         self.client.connect()
         # Read the total energy from the Wago energy meter. The register address and count may need to be adjusted based on the specific model and configuration of the energy meter.
-        result = self.client.read_holding_registers(0x600c, 2, slave=self.slave_id)
+        result = self.client.read_holding_registers(address=0x600c, count=2, device_id=self.slave_id)
         self.client.close()
         
         if result.isError():
@@ -35,7 +36,7 @@ class WagoEnergyMeter:
     def get_current_power_kw(self) -> float:
         self.client.connect()
         # Read the current power from the Wago energy meter.
-        result = self.client.read_holding_registers(0x5012, 2, slave=self.slave_id)
+        result = self.client.read_holding_registers(address=0x5012, count=2, device_id=self.slave_id)
         self.client.close()
         
         if result.isError():
