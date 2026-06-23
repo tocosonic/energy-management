@@ -63,7 +63,7 @@ pyinotify==0.9.6
 PyJWT==2.6.0
 pymodbus==3.0.0rc1
 pyOpenSSL==23.0.0
-pyparsing==3.0.9
+pyparsing==3.3.2
 pyserial==3.5
 pyserial-asyncio==0.6
 pytest==7.2.1
