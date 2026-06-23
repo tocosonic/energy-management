@@ -33,7 +33,16 @@ For that you can simply implement your own service class and replace the default
 
 ## Installation
 
-1. Configuration of the Service
+1. Install dependencies into a virtual environment
+
+    ~~~bash
+    python3 -m venv venv
+    source venv/bin/activate
+
+    pip install -r requirements.txt
+    ~~~
+
+2. Configuration of the Service
 You need a `.env` file to configure the service. Create a `.env` file in the same directory as your main.py with the following content:
 
     ~~~env
@@ -73,14 +82,14 @@ You need a `.env` file to configure the service. Create a `.env` file in the sam
     BMW_STREAMING_TOPIC=<BMW VIN>
     ~~~
 
-2. Create a systemd service file at `/etc/systemd/system/energy-management.service` with the following content:
+3. Create a systemd service file at `/etc/systemd/system/energy-management.service` with the following content:
     ~~~env
     [Unit]
     Description=Energy Management Application
     After=network.target
 
     [Service]
-    ExecStart=/usr/bin/python3 /path/to/your/main.py
+    ExecStart=/path/to/your/main.py or /pathToUsersHome/energy-management/venv/bin/python main.py (when using a virtual environment)
     Restart=always
     RestartSec=5
     User=your_user
@@ -90,23 +99,23 @@ You need a `.env` file to configure the service. Create a `.env` file in the sam
     [Install]
     WantedBy=multi-user.target
     ~~~    
-3. Reload systemd to recognize the new service:
+4. Reload systemd to recognize the new service:
     
     `sudo systemctl daemon-reload`
     
-4. Enable the service to start on boot:
+5. Enable the service to start on boot:
 
     `sudo systemctl enable energy-management.service`
 
-5. Start the service:
+6. Start the service:
 
     `sudo systemctl start energy-management.service`
     
-6. Check the status of the service:
+7. Check the status of the service:
 
     `sudo systemctl status energy-management.service`
     
-7. View logs for the service:
+8. View logs for the service:
 
     `sudo journalctl -u energy-management.service -f`
     
