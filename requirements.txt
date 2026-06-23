@@ -50,7 +50,7 @@ packaging==23.0
 paho-mqtt==2.1.0
 pigpio==1.78
 playwright==1.60.0
-pluggy==1.0.0+repack
+pluggy==1.6.0
 propcache==0.5.2
 py==1.11.0
 pycryptodomex==3.23.0
