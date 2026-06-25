@@ -204,7 +204,7 @@ class EnergyManagementUI:
         with ui.header(elevated=True).style("background-color: #f0f0f0; padding: 10px;").classes("items-center justify-between"):
             ui.label("Energy Status Dashboard").style("font-size: 24px; font-weight: bold;color :#333;")
             
-            energy_status = sonnen_battery_service.get_energy_status_with_available_power_time_series(120, moving_average_interval=GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, battery_average_interval=BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL, car_charging_average_interval=CAR_CHARGING_MOVING_AVERAGE_INTERVAL)
+            energy_status = sonnen_battery_service.get_energy_status_with_available_power_time_series(240, moving_average_interval=GRID_FEED_IN_MOVING_AVERAGE_INTERVAL, battery_average_interval=BATTERY_FEED_IN_MOVING_AVERAGE_INTERVAL, car_charging_average_interval=CAR_CHARGING_MOVING_AVERAGE_INTERVAL)
             if energy_status:
                 # get list of production values from energy_status
                 timestamps = [status.timestamp for status in energy_status]
@@ -220,10 +220,12 @@ class EnergyManagementUI:
                 energy_consumption_home = [max(0, cons - car) for cons, car in zip(energy_consumption, car_charging)]
                 
                 threshold = 1.380  # threshold value in kW == 1 phase at 6A, which is the minimum charging current for GoE to start charging
+                threshold_3phases = 3 * threshold  # threshold value in kW for 3 phases at 6A each
                 min_y = min(min(energy_production), min(energy_consumption), min(energy_feed_in), min(battery_feed_in), min(car_charging), min(available_power))
                 min_y = math.floor(min_y) if min_y < 0 else 0
                 
                 max_y = max(max(energy_production), max(energy_consumption), max(energy_feed_in), max(battery_feed_in), max(car_charging), max(available_power)) * 1.1
+                available_power_above_threshold = [power if power > threshold else None for power in available_power]
                 
                 threshold_band = {
                     "x": [timestamps[0], timestamps[-1], timestamps[-1], timestamps[0]],
@@ -258,6 +260,20 @@ class EnergyManagementUI:
                         },
                         {
                             "x": timestamps,
+                            "y": [threshold_3phases] * len(timestamps),
+                            "type": "scatter",
+                            "mode": "lines",
+                            "name": "3ph min",
+                            "line": {
+                                "color": "#868686",
+                                "width": 1,
+                                "dash": "dash"
+                            },
+                            "hoverinfo": "skip",
+                            "showlegend": False,
+                        },
+                        {
+                            "x": timestamps,
                             "y": [threshold] * len(timestamps),
                             "type": "scatter",
                             "mode": "lines",
@@ -267,13 +283,25 @@ class EnergyManagementUI:
                         },
                         {
                             "x": timestamps,
-                            "y": available_power,
+                            "y": available_power_above_threshold,
                             "type": "scatter",
                             "mode": "lines",
                             "name": "Avg. Avl.",
                             "line": {"color": "rgba(80, 80, 80, 0.3)"},
                             "fill": "tonexty",
-                            "fillcolor": "rgba(182, 182, 221, 0.3)"
+                            "fillcolor": "rgba(182, 182, 221, 0.3)",
+                            "connectgaps": False,
+                        },
+                        {
+                            "x": timestamps,
+                            "y": available_power,
+                            "type": "scatter",
+                            "mode": "lines",
+                            "name": "Avg. Avl.",
+                            "line": {"color": "rgba(80, 80, 80, 0.3)"},
+                            "fill": "none",
+                            "hoverinfo": "skip",
+                            "showlegend": False,
                         },
                         {"x": timestamps, "y": energy_consumption_home, "type": "scatter", "mode": "lines", "name": "Home", "line": {"color": "#4355fab0"}},
                         {"x": timestamps, "y": energy_consumption, "type": "scatter", "mode": "lines", "name": "Cons.", "line": {"color": "#4355faff"}},

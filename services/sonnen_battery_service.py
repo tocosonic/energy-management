@@ -90,6 +90,7 @@ class SonnenBatteryService:
             smoothed_car_charging = int(sum(car_charging_window) / len(car_charging_window)) if car_charging_window else 0
             adjusted_battery_feed_in = smoothed_battery_feed_in if smoothed_battery_feed_in <= 0 else int((3.0 * smoothed_battery_feed_in) / 4.0)
             average_available_power = smoothed_feed_in + smoothed_car_charging + adjusted_battery_feed_in - self.NON_USED_ENERGY_BUFFER
+            average_available_power = max(0, average_available_power)  # Ensure that the average available power is not negative
 
             energy_status_with_available_power_series.append(
                 EnergyStatusWithAverageAvailablePower(
