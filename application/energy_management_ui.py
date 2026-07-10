@@ -58,43 +58,27 @@ class EnergyManagementUI:
         ui.add_head_html('<link rel="apple-touch-icon" href="static/apple-touch-icon.png">')        
         with ui.grid(columns="10px 150px auto").style("padding: 10px;"):
             # Car Charging
-            ui.label("Car Charging").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
+            ui.label("Charger").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
             
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("User").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             (user_id, user_name) = goe_service.get_last_user_with_name()
             ui.label(f"{user_name} (ID: {user_id})").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            charger_status = goe_service.get_charger_status()
+            ui.label(f"{charger_status.label}").style("font-size: 16px; margin-top: 0px;")
             
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("Service status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Service state").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             charging_status = db_service.get_goe_status()
             ui.label(f"{charging_status.action.label} (since {charging_status.timestamp.strftime('%Y-%m-%d, %H:%M:%S')})").style("font-size: 16px; margin-top: 0px;")
 
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("Charger status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            charger_status = goe_service.get_charger_status()
-            ui.label(f"{charger_status.label}").style("font-size: 16px; margin-top: 0px;")
-
-            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            ui.label("Car status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            car_status = goe_service.get_car_status()
-            ui.label(f"{car_status.label}").style("font-size: 16px; margin-top: 0px;")
-            
-            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Power").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             power = energy_meter.get_current_power_kw()
-            ui.label(f"{power} kW").style("font-size: 16px; margin-top: 0px;")
-
-            # ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            # ui.label("PV surplus enabled").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            # pv_enabled = goe_service._is_pv_surplus_enabled()
-            # logic_mode = goe_service.get_logic_mode()
-            # ui.label("Yes" if pv_enabled else "No").style("font-size: 16px; margin-top: 0px;")
-
-            # ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            # ui.label("Logic mode").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
-            # logic_mode = goe_service.get_logic_mode()
-            # ui.label(f"{logic_mode.label}").style("font-size: 16px; margin-top: 0px;")
+            ui.label(f"{power:.3f} kW").style("font-size: 16px; margin-top: 0px;")
 
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Configured phases / current").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
@@ -109,7 +93,12 @@ class EnergyManagementUI:
             ui.label(f"{charger_error.label}").style("font-size: 16px; margin-top: 0px;")
             
             # Car Status
-            ui.label("Car Status").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
+            ui.label("Car").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            car_status = goe_service.get_car_status()
+            ui.label(f"{car_status.label}").style("font-size: 16px; margin-top: 0px;")
 
             if bmw_cardata_service.is_access_token_valid() or bmw_cardata_service.is_refresh_token_valid():
                 ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
@@ -177,6 +166,14 @@ class EnergyManagementUI:
 
             # Sonnen Battery
             ui.label("Sonnen Battery").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
+
+            battery_feed = sonnen_battery_service.get_battery_feed() / 1000  # Convert to kW
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Status").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            battery_status = "Charging" if battery_feed > 0.01 else ("Discharging" if battery_feed < -0.01 else "Idle")
+            ui.label(f"{battery_status}").style("font-size: 16px; margin-top: 0px;")
+            
             ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             ui.label("Battery level").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             battery_level = sonnen_battery_service.get_battery_level()
@@ -186,6 +183,10 @@ class EnergyManagementUI:
             ui.label("Discharging allowed").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
             discharging_allowed = not sonnen_battery_service.is_discharge_disabled()
             ui.label("Yes" if discharging_allowed else "No").style("font-size: 16px; margin-top: 0px;")
+
+            ui.label("").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label("Power").style("font-size: 16px; font-weight: bold; margin-top: 0px;")
+            ui.label(f"{battery_feed:.3f} kW").style("font-size: 16px; margin-top: 0px;")
         
             # WW Heatpump
             ui.label(f"{ww_heatpump_service.name}").style("font-size: 18px; font-weight: bold; margin-top: 20px;").classes("col-span-full")
