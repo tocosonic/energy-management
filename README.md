@@ -12,7 +12,10 @@ Other than that it appeared to me that Go-E's implementation of PV surplus charg
 <br />
 
 <figure class="image">
+<img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/4b2ec406-9366-4cfe-889c-bc6b27297056" />
+
 <img width="422" height="917" alt="image" src="https://github.com/user-attachments/assets/9b8ecb52-1cd2-462d-9f8a-ddeb6b06b6a0" />
+
 <p><figcaption><em>Fig. 2. iOS view of the status. This page was installed as shortcut on the home screen.</em></figcaption></p>
 </figure>
 
