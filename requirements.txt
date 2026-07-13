@@ -72,7 +72,7 @@ pyserial==3.5
 pyserial-asyncio==0.6
 pytest==9.1.1
 pytest-base-url==2.1.0
-pytest-httpserver==1.0.6
+pytest-httpserver==1.1.5
 pytest-mock==3.15.1
 pytest-playwright==0.8.0
 python-apt==2.6.0
