@@ -36,7 +36,7 @@ iniconfig==1.1.1
 itsdangerous==2.2.0
 Jinja2==3.1.6
 lazr.restfulclient==0.14.6
-lazr.uri==1.0.6
+lazr.uri==1.0.8
 lgpio==0.2.2.0
 lxml==6.1.1
 lxml_html_clean==0.4.5
