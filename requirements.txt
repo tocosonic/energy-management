@@ -32,7 +32,7 @@ httptools==0.8.0
 httpx==0.28.1
 idna==3.18
 ifaddr==0.2.0
-iniconfig==1.1.1
+iniconfig==2.3.0
 itsdangerous==2.2.0
 Jinja2==3.1.6
 lazr.restfulclient==0.14.6
