@@ -46,7 +46,7 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 more-itertools==11.1.0
 multidict==6.7.1
-nicegui==3.13.0
+nicegui==3.14.0
 oauthlib==3.3.1
 orjson==3.11.9
 packaging==26.2
