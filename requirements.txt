@@ -78,7 +78,7 @@ pytest-playwright==0.8.0
 python-apt==2.6.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
-python-engineio==4.13.3
+python-engineio==4.13.4
 python-multipart==0.0.32
 python-slugify==8.0.4
 python-socketio==5.16.3
