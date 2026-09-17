@@ -284,8 +284,8 @@ class EnergyManagementApplication:
                         # in case the charger is running: turn it off (the check will be done in the called method)
                         self.process_charging_finished()
                         return ChargerAction.NO_ACTION
-                
-            else:
+            elif self.goe_service.is_fixed_charging_user():
+            # else:
                 log.debug(f"The last authenticated user is the fixed charging user.")
                 # If the last authenticated user is the fixed charging user, we will turn on the car charging with max. power and disable discharging of the battery.
                 if self.goe_service.get_total_power_average() > 250:
@@ -307,9 +307,12 @@ class EnergyManagementApplication:
                             self.db_service.create_goe_action(ChargerAction.MAX_CHARGING, session_id, current_user)
                         return ChargerAction.MAX_CHARGING
                 
-                log.warning(f"This code should not be reached: requesting max charging but setting max charging was not successful.")
+                log.error(f"This code should not be reached: requesting max charging but setting max charging was not successful.")
                 self.db_service.create_goe_action(ChargerAction.REQUEST_MAX_CHARGING, user_id=current_user)
                 return ChargerAction.REQUEST_MAX_CHARGING
+            else:
+                log.debug(f"Car charging not active")
+                return self.db_service.create_goe_action(ChargerAction.NO_ACTION, user_id=current_user)
                 
         else:
             log.debug(f"Car charging is currently not allowed and the car is not charging.")
