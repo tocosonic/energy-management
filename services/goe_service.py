@@ -143,6 +143,11 @@ class GoEService:
             Whether the last authenticated user is the dynamic charging user."""
         return self.get_authenticated_user() == self.dynamic_charging_user
 
+    def is_fixed_charging_user(self) -> bool:
+        """Returns:
+            Whether the last authenticated user is the fixed charging user."""
+        return self.get_authenticated_user() == self.fixed_charging_user
+
     def get_logic_mode(self) -> LogicMode:
         """Returns:
             The current logic mode of the charger (Default=3, Awattar=4, AutomaticStop=5)."""
@@ -473,6 +478,9 @@ class GoEService:
             True if the update succeeded, otherwise False.
         """
         total_current_required = power / 230  # convert energy in watts to current in amperes assuming 230 V
+        
+        log.info(f"Requested charging power: {power} W, total current required: {total_current_required} A")
+        
         if total_current_required < 6:
             log.debug(f"Requested power {power} W is too low. Minimum is {self.MINIMUM_ENERGY_CONSUMPTION} W (6 A). Turning charging off and setting minimum values.")
             ret = self.set_charging_off()
