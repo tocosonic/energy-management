@@ -222,11 +222,18 @@ class EnergyManagementApplication:
                     # take the real power as measured by the energy meter
                     consumed_power = self.energy_meter.get_current_power_w()
                     battery_feed_in = self.sonnen_battery_service.get_battery_feed()
-                    # take 75% of battery charging energy as available energy for car charging, to account for battery charging efficiency and to avoid rapidly turning on and off the car charging due to fluctuations in the battery feed-in. This means that if the battery is charging (battery_feed_in > 0), we will only consider 75% of the battery feed-in as available energy for car charging.
-                    battery_discharge = -battery_feed_in if battery_feed_in < 0 else -int(3 * battery_feed_in / 4)
+                    # only take battery discharging into account
+                    battery_discharge = -battery_feed_in if battery_feed_in < 0 else 0
+                    battery_level = self.sonnen_battery_service.get_battery_level()
                     
-                    available_power = avg_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power - battery_discharge
-                    log.debug(f"Average grid feed-in: {avg_power} W, current car charging power: {consumed_power} W, buffer power: {self.control_structure.NON_USED_ENERGY_BUFFER} W, battery discharge: {battery_discharge} W, available power for car charging after buffer: {available_power} W")
+                    # total available power
+                    available_power_unadjusted = avg_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power - battery_discharge
+
+                    battery_charging_power = 0 if battery_level > 95 else (2500 if available_power_unadjusted < 5500 else 4000)
+                    
+                    # adjust available power to ensure the home battery will also be charged
+                    available_power = avg_power - self.control_structure.NON_USED_ENERGY_BUFFER + consumed_power - battery_discharge - battery_charging_power
+                    log.debug(f"Average grid feed-in: {avg_power} W, current car charging power: {consumed_power} W, buffer power: {self.control_structure.NON_USED_ENERGY_BUFFER} W, battery discharge: {battery_discharge} W, battery charging power: {battery_charging_power} W, available power for car charging after buffer: {available_power} W")
 
                 log.debug(f"Average available power for car charging in the last {self.control_structure.GRID_FEED_IN_MOVING_AVERAGE_INTERVAL} minutes: {available_power} W")
                 
